@@ -12,8 +12,8 @@ import LogoBlueTube from '../components/LogoBlueTube';
 
 const EMAIL_KEY = 'bt_last_email';
 
-export default function LoginScreen({ navigation }) {
-  const [mode, setMode] = useState('signin');
+export default function LoginScreen({ navigation, route }) {
+  const [mode, setMode] = useState(route?.params?.mode === 'signup' ? 'signup' : 'signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPwd, setShowPwd] = useState(false);

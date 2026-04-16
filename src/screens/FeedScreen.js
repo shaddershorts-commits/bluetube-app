@@ -1,12 +1,15 @@
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Dimensions, ActivityIndicator } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFeedStore } from '../store';
+import { useAuthStore, useFeedStore } from '../store';
 import VideoCard from '../components/VideoCard';
 import LivesBar from '../components/LivesBar';
+import PopupBoasVindas from '../components/PopupBoasVindas';
 import blueAPI from '../api';
 import { COLORS } from '../constants';
+
+let _popupShownThisSession = false;
 
 const { height: H } = Dimensions.get('window');
 const TAB_H = 60;
@@ -14,8 +17,18 @@ const CARD_H = H - TAB_H;
 
 export default function FeedScreen() {
   const { videos, addVideos, setVideos, cursor, setCursor, hasMore, setHasMore, isLoading, setLoading, setCurrentIndex } = useFeedStore();
+  const user = useAuthStore((s) => s.user);
   const listRef = useRef(null);
   const insets = useSafeAreaInsets();
+  const [showPopup, setShowPopup] = useState(false);
+
+  useEffect(() => {
+    if (!_popupShownThisSession) {
+      _popupShownThisSession = true;
+      const t = setTimeout(() => setShowPopup(true), 600);
+      return () => clearTimeout(t);
+    }
+  }, []);
 
   const loadFeed = useCallback(async (reset = false) => {
     if (isLoading) return;
@@ -84,6 +97,11 @@ export default function FeedScreen() {
       <View style={[styles.livesOverlay, { top: insets.top }]} pointerEvents="box-none">
         <LivesBar />
       </View>
+      <PopupBoasVindas
+        visible={showPopup}
+        username={user?.user_metadata?.username || user?.email?.split('@')[0]}
+        onClose={() => setShowPopup(false)}
+      />
     </View>
   );
 }

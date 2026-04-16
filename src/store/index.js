@@ -4,6 +4,7 @@ import * as SecureStore from 'expo-secure-store';
 export const useAuthStore = create((set) => ({
   token: null,
   user: null,
+  introSeen: false,
   isLoading: true,
   setToken: async (token) => {
     if (token) await SecureStore.setItemAsync('bt_token', token);
@@ -11,6 +12,10 @@ export const useAuthStore = create((set) => ({
     set({ token });
   },
   setUser: (user) => set({ user }),
+  markIntroSeen: async () => {
+    await SecureStore.setItemAsync('bt_intro_visto', '1').catch(() => {});
+    set({ introSeen: true });
+  },
   logout: async () => {
     await SecureStore.deleteItemAsync('bt_token');
     await SecureStore.deleteItemAsync('bt_refresh_token');
@@ -18,8 +23,11 @@ export const useAuthStore = create((set) => ({
   },
   init: async () => {
     try {
-      const token = await SecureStore.getItemAsync('bt_token');
-      set({ token, isLoading: false });
+      const [token, introFlag] = await Promise.all([
+        SecureStore.getItemAsync('bt_token'),
+        SecureStore.getItemAsync('bt_intro_visto'),
+      ]);
+      set({ token, introSeen: introFlag === '1', isLoading: false });
     } catch {
       set({ isLoading: false });
     }

@@ -1,4 +1,4 @@
-import { View, ActivityIndicator, StyleSheet, Text } from 'react-native';
+import { useState, useEffect } from 'react';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -6,6 +6,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../store';
 import { COLORS } from '../constants';
 
+import SplashScreen from '../screens/SplashScreen';
+import IntroScreen from '../screens/IntroScreen';
 import LoginScreen from '../screens/LoginScreen';
 import FeedScreen from '../screens/FeedScreen';
 import DiscoverScreen from '../screens/DiscoverScreen';
@@ -57,22 +59,27 @@ function MainTabs() {
 }
 
 export default function Navigation() {
-  const { token, isLoading } = useAuthStore();
+  const { token, isLoading, introSeen } = useAuthStore();
+  const [splashDone, setSplashDone] = useState(false);
 
-  if (isLoading) {
-    return (
-      <View style={styles.splash}>
-        <Text style={styles.logo}>Blue<Text style={{ color: COLORS.neon }}>Tube</Text></Text>
-        <ActivityIndicator color={COLORS.neon} />
-      </View>
-    );
+  // Fallback: even if animation never finishes, move on after 3s.
+  useEffect(() => {
+    const t = setTimeout(() => setSplashDone(true), 3000);
+    return () => clearTimeout(t);
+  }, []);
+
+  if (isLoading || !splashDone) {
+    return <SplashScreen onFinish={() => setSplashDone(true)} />;
   }
 
   return (
     <NavigationContainer theme={NAV_THEME}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!token ? (
-          <Stack.Screen name="Login" component={LoginScreen} />
+          <>
+            {!introSeen && <Stack.Screen name="Intro" component={IntroScreen} />}
+            <Stack.Screen name="Login" component={LoginScreen} />
+          </>
         ) : (
           <>
             <Stack.Screen name="Main" component={MainTabs} />
@@ -86,8 +93,3 @@ export default function Navigation() {
     </NavigationContainer>
   );
 }
-
-const styles = StyleSheet.create({
-  splash: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.background, gap: 20 },
-  logo: { color: '#fff', fontSize: 36, fontWeight: '800' },
-});
