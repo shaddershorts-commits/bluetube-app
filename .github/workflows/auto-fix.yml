@@ -149,18 +149,57 @@ jobs:
           SCRIPT
           node /tmp/analyze.js
 
-      - name: Aplicar fix (se confiança ≥ 0.85 e não requer revisão)
-        id: apply
+      - name: Decidir se precisa aprovação humana
+        id: decide
         if: env.FILE_EXISTS == 'true'
         run: |
-          if [ ! -f /tmp/fix.json ]; then echo "applied=false" >> $GITHUB_OUTPUT; exit 0; fi
-          APPLY=$(node -e "const f=require('/tmp/fix.json');console.log(f.pode_corrigir && !f.requer_revisao_humana)")
-          if [ "$APPLY" = "true" ]; then
-            node -e "require('fs').writeFileSync(process.env.FILE_PATH, require('/tmp/fix.json').codigo_corrigido)"
-            echo "applied=true" >> $GITHUB_OUTPUT
-          else
-            echo "applied=false" >> $GITHUB_OUTPUT
+          if [ ! -f /tmp/fix.json ]; then
+            echo "can_apply=false" >> $GITHUB_OUTPUT
+            echo "needs_approval=false" >> $GITHUB_OUTPUT
+            exit 0
           fi
+          CAN=$(node -e "const f=require('/tmp/fix.json');console.log(f.pode_corrigir && !f.requer_revisao_humana)")
+          echo "can_apply=$CAN" >> $GITHUB_OUTPUT
+          # Requer aprovação se: Claude pode aplicar MAS severidade=critical
+          if [ "$CAN" = "true" ] && [ "$SEVERITY" = "critical" ]; then
+            echo "needs_approval=true" >> $GITHUB_OUTPUT
+          else
+            echo "needs_approval=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Aguardar aprovação humana (bugs críticos)
+        if: steps.decide.outputs.needs_approval == 'true'
+        uses: trstringer/manual-approval@v1
+        timeout-minutes: 60
+        with:
+          secret: ${{ secrets.GH_TOKEN }}
+          approvers: shaddershorts-commits
+          minimum-approvals: 1
+          issue-title: "🤖 Fix crítico aguardando aprovação: ${{ env.ERROR_MESSAGE }}"
+          issue-body: |
+            **Erro:** ${{ env.ERROR_MESSAGE }}
+            **Arquivo:** `${{ env.FILE_PATH }}`
+            **Severidade:** ${{ env.SEVERITY }}
+
+            Claude gerou fix automático mas severidade é `critical` — precisa do seu OK.
+
+            Responda **approve** pra aplicar o fix + commit + OTA,
+            ou **deny** pra rejeitar e abrir pra revisão manual.
+
+            Ver fix completo: [job run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          exclude-workflow-initiator-as-approver: false
+
+      - name: Aplicar fix (se aprovado OU não-crítico)
+        id: apply
+        if: env.FILE_EXISTS == 'true' && steps.decide.outputs.can_apply == 'true'
+        run: |
+          node -e "require('fs').writeFileSync(process.env.FILE_PATH, require('/tmp/fix.json').codigo_corrigido)"
+          echo "applied=true" >> $GITHUB_OUTPUT
+
+      - name: Marcar como não-aplicado (se pulou)
+        id: skip
+        if: env.FILE_EXISTS == 'true' && steps.decide.outputs.can_apply != 'true'
+        run: echo "applied=false" >> $GITHUB_OUTPUT
 
       - name: Commit + push do fix
         if: steps.apply.outputs.applied == 'true'
