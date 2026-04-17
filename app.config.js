@@ -41,11 +41,13 @@ export default {
                   'expo-media-library',
                   'expo-notifications',
                   'expo-av',
+                  '@sentry/react-native/expo',
                 ],
           extra: {
                   supabaseUrl: process.env.SUPABASE_URL || 'https://pokpfvjrccviwgguwuck.supabase.co',
                   supabaseKey: process.env.SUPABASE_ANON_KEY || '',
                   apiBaseUrl: process.env.API_BASE_URL || 'https://bluetubeviral.com/api',
+                  sentryDsn: process.env.SENTRY_DSN || '',
                   eas: { projectId: 'c7a657a7-92a2-42ba-9cab-77a54a62077f' },
           },
     },

@@ -7,28 +7,39 @@ import Toast from 'react-native-toast-message';
 import * as NavigationBar from 'expo-navigation-bar';
 import Navigation from './src/navigation';
 import { useAuthStore } from './src/store';
+import ErrorBoundary from './src/components/ErrorBoundary';
+import { initSentry, setUserContext, wrap } from './src/utils/sentry';
 
-export default function App() {
-    const init = useAuthStore((s) => s.init);
+// Sentry precisa inicializar antes de qualquer render
+initSentry();
+
+function App() {
+  const init = useAuthStore((s) => s.init);
+  const user = useAuthStore((s) => s.user);
 
   useEffect(() => {
-        init();
-
-                // Passo 10: NavigationBar Android — fundo escuro com botoes claros
-                if (Platform.OS === 'android') {
-                        NavigationBar.setBackgroundColorAsync('#020817').catch(() => {});
-                        NavigationBar.setButtonStyleAsync('light').catch(() => {});
-                }
+    init();
+    if (Platform.OS === 'android') {
+      NavigationBar.setBackgroundColorAsync('#020817').catch(() => {});
+      NavigationBar.setButtonStyleAsync('light').catch(() => {});
+    }
   }, []);
 
+  useEffect(() => {
+    if (user) setUserContext(user);
+  }, [user]);
+
   return (
-        <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
+    <ErrorBoundary>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
           <StatusBar style="light" translucent backgroundColor="transparent" />
           <Navigation />
-{/* Passo 10: Toast global — use Toast.show() em qualquer lugar */}
-        <Toast />
-  </SafeAreaProvider>
-  </GestureHandlerRootView>
+          <Toast />
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </ErrorBoundary>
   );
 }
+
+export default wrap(App);

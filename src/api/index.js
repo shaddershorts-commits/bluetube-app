@@ -1,5 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import { API_BASE } from '../constants';
+import { addBreadcrumb, captureError } from '../utils/sentry';
 
 async function getToken() {
     return await SecureStore.getItemAsync('bt_token');
@@ -7,16 +8,23 @@ async function getToken() {
 
 async function api(endpoint, options = {}) {
     const url = `${API_BASE}/${endpoint}`;
-    const response = await fetch(url, {
-          ...options,
-          headers: {
-                  'Content-Type': 'application/json',
-                  ...options.headers,
-          },
-    });
-    const text = await response.text();
-    try { return JSON.parse(text); }
-    catch { return { error: text, status: response.status }; }
+    const method = options.method || 'GET';
+    addBreadcrumb(`API ${method} ${endpoint.split('?')[0]}`, 'http', { method });
+    try {
+        const response = await fetch(url, {
+              ...options,
+              headers: {
+                      'Content-Type': 'application/json',
+                      ...options.headers,
+              },
+        });
+        const text = await response.text();
+        try { return JSON.parse(text); }
+        catch { return { error: text, status: response.status }; }
+    } catch (error) {
+        captureError(error, { endpoint, method });
+        return { error: error.message || 'network_error', status: 0 };
+    }
 }
 
 export const blueAPI = {

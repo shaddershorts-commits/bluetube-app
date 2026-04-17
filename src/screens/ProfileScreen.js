@@ -66,6 +66,8 @@ export default function ProfileScreen() {
         <MenuItem icon="bookmark-outline" label="Salvos" />
         <MenuItem icon="notifications-outline" label="Notificações" />
         <MenuItem icon="settings-outline" label="Configurações" />
+        {/* TEMP: remover após confirmar Sentry. Dispara crash proposital. */}
+        <MenuItem icon="bug-outline" label="Testar Sentry (crash)" onPress={() => { throw new Error('Teste Sentry BlueTube'); }} color={COLORS.gold} />
         <MenuItem icon="log-out-outline" label="Sair" onPress={handleLogout} color={COLORS.red} />
       </View>
     </ScrollView>
