@@ -1,0 +1,75 @@
+name: Verificação Diária de Saúde
+
+on:
+  schedule:
+    # 08:00 BRT = 11:00 UTC
+    - cron: '0 11 * * *'
+  workflow_dispatch:
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Verificar APIs do backend
+        continue-on-error: true
+        run: |
+          echo "→ Verificando bluetubeviral.com/api"
+          HTTP=$(curl -s -o /dev/null -w "%{http_code}" https://bluetubeviral.com/api/blue-feed?action=stats || echo "000")
+          echo "blue-feed stats → $HTTP"
+          if [ "$HTTP" != "200" ] && [ "$HTTP" != "429" ]; then
+            echo "::warning::API /blue-feed respondeu $HTTP"
+          fi
+
+      - name: Verificar issues não resolvidas no Sentry
+        id: sentry
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+        run: |
+          if [ -z "$SENTRY_AUTH_TOKEN" ]; then echo "::notice::SENTRY_AUTH_TOKEN não configurado — pulando"; echo "count=0" >> $GITHUB_OUTPUT; exit 0; fi
+          RESP=$(curl -sf "https://sentry.io/api/0/projects/$SENTRY_ORG/$SENTRY_PROJECT/issues/?query=is:unresolved&statsPeriod=24h&limit=20" \
+            -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" || echo "[]")
+          COUNT=$(echo "$RESP" | node -e "try{console.log(JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).length)}catch{console.log(0)}")
+          echo "count=$COUNT" >> $GITHUB_OUTPUT
+          echo "Issues não resolvidas (24h): $COUNT"
+          echo "$RESP" | node -e "
+            try {
+              const issues = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
+              issues.slice(0, 10).forEach(i => {
+                console.log('-', i.level?.toUpperCase() || 'INFO', '|', i.title, '| eventos:', i.count, '| users:', i.userCount);
+              });
+            } catch(e) {}"
+
+      - name: Notificar se houver issues críticas
+        if: steps.sentry.outputs.count != '0' && steps.sentry.outputs.count != ''
+        env:
+          COUNT: ${{ steps.sentry.outputs.count }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          EVOLUTION_API_URL: ${{ secrets.EVOLUTION_API_URL }}
+          EVOLUTION_API_KEY: ${{ secrets.EVOLUTION_API_KEY }}
+          WHATSAPP_PHONE: ${{ secrets.WHATSAPP_PHONE }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+        run: |
+          SENTRY_URL="https://${SENTRY_ORG}.sentry.io/issues/"
+          if [ -n "$RESEND_API_KEY" ] && [ -n "$ADMIN_EMAIL" ]; then
+            curl -s -X POST https://api.resend.com/emails \
+              -H "Authorization: Bearer $RESEND_API_KEY" \
+              -H "Content-Type: application/json" \
+              -d "{\"from\":\"BlueTube Bot <bot@bluetubeviral.com>\",\"to\":\"$ADMIN_EMAIL\",\"subject\":\"🔍 Health check diário — $COUNT issues abertas\",\"html\":\"<p><strong>$COUNT</strong> issues não resolvidas nas últimas 24h.</p><p><a href='$SENTRY_URL'>Abrir Sentry →</a></p>\"}" > /dev/null
+          fi
+          if [ -n "$EVOLUTION_API_URL" ] && [ -n "$EVOLUTION_API_KEY" ] && [ -n "$WHATSAPP_PHONE" ]; then
+            curl -s -X POST "$EVOLUTION_API_URL/message/sendText/bluetube" \
+              -H "apikey: $EVOLUTION_API_KEY" \
+              -H "Content-Type: application/json" \
+              -d "{\"number\":\"$WHATSAPP_PHONE\",\"text\":\"🔍 *BlueTube health check*\n\n$COUNT issues abertas (24h)\n\n$SENTRY_URL\"}" > /dev/null
+          fi

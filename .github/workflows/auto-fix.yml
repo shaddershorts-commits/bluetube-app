@@ -1,0 +1,267 @@
+name: BlueTube Auto-Fix Pipeline
+
+on:
+  repository_dispatch:
+    types: [sentry-alert]
+  workflow_dispatch:
+    inputs:
+      error_message:
+        description: 'Mensagem de erro'
+        required: true
+      file_path:
+        description: 'Arquivo com o bug (ex: src/screens/FeedScreen.js)'
+        required: true
+      stack_trace:
+        description: 'Stack trace completo'
+        required: true
+      severity:
+        description: 'Severidade (low/medium/high/critical)'
+        required: true
+        default: 'medium'
+
+# Evita execuções concorrentes no mesmo arquivo — importante porque o bot dá push
+concurrency:
+  group: auto-fix-${{ github.event.inputs.file_path || github.event.client_payload.file_path }}
+  cancel-in-progress: false
+
+jobs:
+  analyze-and-fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # Todas as variáveis vindas do evento viram env vars (evita injection via ${{ }} em shell)
+    env:
+      ERROR_MESSAGE: ${{ github.event.inputs.error_message || github.event.client_payload.error_message }}
+      FILE_PATH: ${{ github.event.inputs.file_path || github.event.client_payload.file_path }}
+      STACK_TRACE: ${{ github.event.inputs.stack_trace || github.event.client_payload.stack_trace }}
+      SEVERITY: ${{ github.event.inputs.severity || github.event.client_payload.severity || 'medium' }}
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Validar file_path (anti path-traversal)
+        run: |
+          if [[ "$FILE_PATH" == *".."* ]] || [[ "$FILE_PATH" == /* ]] || [[ ! "$FILE_PATH" =~ ^[a-zA-Z0-9._/-]+$ ]]; then
+            echo "::error::file_path inválido: $FILE_PATH"
+            exit 1
+          fi
+          if [ ! -f "$FILE_PATH" ]; then
+            echo "::warning::Arquivo $FILE_PATH não encontrado — pulando"
+            echo "FILE_EXISTS=false" >> $GITHUB_ENV
+          else
+            echo "FILE_EXISTS=true" >> $GITHUB_ENV
+          fi
+
+      - name: Analisar bug com Claude + gravar fix.json
+        if: env.FILE_EXISTS == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          cat > /tmp/analyze.js <<'SCRIPT'
+          const https = require('https');
+          const fs = require('fs');
+
+          const filePath = process.env.FILE_PATH;
+          const fileContent = fs.readFileSync(filePath, 'utf8').slice(0, 20000);
+
+          const prompt = [
+            'Você é um engenheiro sênior de React Native / Expo.',
+            '',
+            'ERRO DETECTADO NO APP BLUETUBE:',
+            `Arquivo: ${filePath}`,
+            `Severidade: ${process.env.SEVERITY}`,
+            `Erro: ${process.env.ERROR_MESSAGE}`,
+            '',
+            'STACK TRACE:',
+            process.env.STACK_TRACE || '(não disponível)',
+            '',
+            'CÓDIGO ATUAL DO ARQUIVO:',
+            '```',
+            fileContent,
+            '```',
+            '',
+            'TAREFA:',
+            '1. Identifique a causa raiz do erro',
+            '2. Gere o arquivo COMPLETO corrigido (preserve toda lógica existente)',
+            '3. Use optional chaining (?.) para prevenir null/undefined',
+            '4. Adicione try/catch onde for seguro',
+            '5. Se o erro parece vir de outro arquivo, marque requer_revisao_humana=true',
+            '6. Se confiança < 0.85, marque requer_revisao_humana=true',
+            '',
+            'RESPONDA APENAS COM JSON VÁLIDO (sem markdown, sem crases):',
+            '{',
+            '  "pode_corrigir": true|false,',
+            '  "causa_raiz": "explicação curta em pt-BR",',
+            '  "descricao_fix": "o que foi corrigido em pt-BR, max 80 chars",',
+            '  "codigo_corrigido": "código completo do arquivo",',
+            '  "confianca": 0.0-1.0,',
+            '  "requer_revisao_humana": true|false',
+            '}',
+          ].join('\n');
+
+          const body = JSON.stringify({
+            model: 'claude-opus-4-7',
+            max_tokens: 8000,
+            messages: [{ role: 'user', content: prompt }],
+          });
+
+          const req = https.request({
+            hostname: 'api.anthropic.com',
+            path: '/v1/messages',
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': process.env.ANTHROPIC_API_KEY,
+              'anthropic-version': '2023-06-01',
+              'Content-Length': Buffer.byteLength(body),
+            },
+          }, (res) => {
+            let buf = '';
+            res.on('data', (c) => (buf += c));
+            res.on('end', () => {
+              try {
+                const resp = JSON.parse(buf);
+                if (resp.error) { console.error(resp.error); process.exit(2); }
+                const text = resp.content[0].text;
+                const m = text.match(/\{[\s\S]*\}/);
+                if (!m) { console.error('JSON não encontrado na resposta'); process.exit(3); }
+                const fix = JSON.parse(m[0]);
+                // Clamp obrigatório: nunca aplicar sem confiança alta
+                if (!fix.pode_corrigir || fix.confianca < 0.85) fix.requer_revisao_humana = true;
+                fs.writeFileSync('/tmp/fix.json', JSON.stringify(fix));
+                console.log(`pode_corrigir=${fix.pode_corrigir} confianca=${fix.confianca} revisao=${fix.requer_revisao_humana}`);
+              } catch (e) { console.error(e); process.exit(4); }
+            });
+          });
+          req.on('error', (e) => { console.error(e); process.exit(5); });
+          req.write(body);
+          req.end();
+          SCRIPT
+          node /tmp/analyze.js
+
+      - name: Aplicar fix (se confiança ≥ 0.85 e não requer revisão)
+        id: apply
+        if: env.FILE_EXISTS == 'true'
+        run: |
+          if [ ! -f /tmp/fix.json ]; then echo "applied=false" >> $GITHUB_OUTPUT; exit 0; fi
+          APPLY=$(node -e "const f=require('/tmp/fix.json');console.log(f.pode_corrigir && !f.requer_revisao_humana)")
+          if [ "$APPLY" = "true" ]; then
+            node -e "require('fs').writeFileSync(process.env.FILE_PATH, require('/tmp/fix.json').codigo_corrigido)"
+            echo "applied=true" >> $GITHUB_OUTPUT
+          else
+            echo "applied=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit + push do fix
+        if: steps.apply.outputs.applied == 'true'
+        run: |
+          DESC=$(node -e "console.log(require('/tmp/fix.json').descricao_fix)")
+          CAUSA=$(node -e "console.log(require('/tmp/fix.json').causa_raiz)")
+          CONF=$(node -e "console.log(Math.round(require('/tmp/fix.json').confianca*100))")
+          git config user.name "BlueTube Bot"
+          git config user.email "bot@bluetubeviral.com"
+          git add "$FILE_PATH"
+          git commit -m "auto-fix: $DESC" -m "Causa: $CAUSA" -m "Confiança: ${CONF}% | Erro: $ERROR_MESSAGE"
+          git push origin HEAD:main
+
+      - name: Publicar OTA update (expo-updates)
+        if: steps.apply.outputs.applied == 'true'
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          npm ci --legacy-peer-deps
+          npm install -g eas-cli
+          DESC=$(node -e "console.log(require('/tmp/fix.json').descricao_fix)")
+          eas update --branch production --message "auto-fix: $DESC" --non-interactive || echo "::warning::OTA falhou — provavelmente expo-updates não configurado"
+
+      - name: Notificar (email + WhatsApp)
+        if: always() && env.FILE_EXISTS == 'true'
+        env:
+          APPLIED: ${{ steps.apply.outputs.applied }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          EVOLUTION_API_URL: ${{ secrets.EVOLUTION_API_URL }}
+          EVOLUTION_API_KEY: ${{ secrets.EVOLUTION_API_KEY }}
+          WHATSAPP_PHONE: ${{ secrets.WHATSAPP_PHONE }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          cat > /tmp/notify.js <<'NOTIFY'
+          const https = require('https');
+          const fs = require('fs');
+
+          const applied = process.env.APPLIED === 'true';
+          const fix = fs.existsSync('/tmp/fix.json') ? JSON.parse(fs.readFileSync('/tmp/fix.json','utf8')) : {};
+          const statusLabel = applied ? 'CORRIGIDO AUTOMATICAMENTE' : 'REQUER REVISÃO MANUAL';
+          const emoji = applied ? '✅' : '⚠️';
+
+          function post(host, path, headers, data) {
+            return new Promise((resolve) => {
+              const req = https.request({ hostname: host, path, method: 'POST', headers }, (res) => {
+                let b = ''; res.on('data', (c) => (b += c)); res.on('end', () => resolve({ status: res.statusCode, body: b }));
+              });
+              req.on('error', (e) => resolve({ error: e.message }));
+              req.write(data); req.end();
+            });
+          }
+
+          async function email() {
+            if (!process.env.RESEND_API_KEY || !process.env.ADMIN_EMAIL) return;
+            const html = `
+              <div style="background:#020817;color:#e8f4ff;padding:32px;font-family:system-ui,sans-serif;border-radius:16px;border:1px solid #1a6bff">
+                <h2 style="color:#00aaff;margin:0 0 16px">${emoji} ${statusLabel}</h2>
+                <p><strong>Arquivo:</strong> <code>${process.env.FILE_PATH}</code></p>
+                <p><strong>Erro:</strong> ${process.env.ERROR_MESSAGE}</p>
+                ${fix.causa_raiz ? `<p><strong>Causa-raiz:</strong> ${fix.causa_raiz}</p>` : ''}
+                ${applied
+                  ? `<p><strong>Fix aplicado:</strong> ${fix.descricao_fix || ''}</p>
+                     <p><strong>Confiança IA:</strong> ${Math.round((fix.confianca || 0) * 100)}%</p>
+                     <p style="color:#00e676">OTA update publicado — usuários recebem na próxima abertura</p>`
+                  : `<p style="color:#ffaa00">Fix gerado mas precisa revisão.</p>
+                     <a href="${process.env.RUN_URL}" style="display:inline-block;background:#1a6bff;color:#fff;padding:12px 24px;border-radius:10px;text-decoration:none;font-weight:700">Abrir no GitHub Actions →</a>`}
+              </div>`;
+            return post('api.resend.com', '/emails', {
+              'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+              'Content-Type': 'application/json',
+            }, JSON.stringify({
+              from: 'BlueTube Bot <bot@bluetubeviral.com>',
+              to: process.env.ADMIN_EMAIL,
+              subject: `${emoji} BlueTube Bug ${applied ? 'CORRIGIDO' : 'DETECTADO'}: ${(process.env.ERROR_MESSAGE || '').slice(0, 60)}`,
+              html,
+            }));
+          }
+
+          async function whatsapp() {
+            if (!process.env.EVOLUTION_API_URL || !process.env.EVOLUTION_API_KEY || !process.env.WHATSAPP_PHONE) return;
+            const lines = [
+              `${emoji} *BlueTube Auto-Fix*`,
+              '',
+              `*${statusLabel}*`,
+              '',
+              `📁 ${process.env.FILE_PATH}`,
+              `❌ ${(process.env.ERROR_MESSAGE || '').slice(0, 120)}`,
+            ];
+            if (applied) {
+              lines.push(`✅ ${fix.descricao_fix || ''}`, `📊 Confiança: ${Math.round((fix.confianca || 0) * 100)}%`, `🚀 OTA publicado`);
+            } else {
+              lines.push(`👉 ${process.env.RUN_URL}`);
+            }
+            const url = new URL(`${process.env.EVOLUTION_API_URL}/message/sendText/bluetube`);
+            return post(url.hostname, url.pathname, {
+              'apikey': process.env.EVOLUTION_API_KEY,
+              'Content-Type': 'application/json',
+            }, JSON.stringify({ number: process.env.WHATSAPP_PHONE, text: lines.join('\n') }));
+          }
+
+          Promise.allSettled([email(), whatsapp()]).then((r) => console.log(JSON.stringify(r)));
+          NOTIFY
+          node /tmp/notify.js
