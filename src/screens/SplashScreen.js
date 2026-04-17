@@ -71,7 +71,7 @@ export default function SplashScreen({ onFinish }) {
       <StatusBar style="light" translucent backgroundColor="transparent" />
       {particles.map((p) => <Particle {...p} />)}
       <Animated.View style={{ transform: [{ scale: logoScale }], opacity: logoOpacity }}>
-        <LogoBlueTube width={260} height={76} />
+        <LogoBlueTube width={260} height={150} variant="stacked" tagline />
       </Animated.View>
       <Animated.Text
         style={[styles.tagline, { opacity: taglineOpacity, transform: [{ translateY: taglineY }] }]}

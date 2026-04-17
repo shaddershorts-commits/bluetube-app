@@ -105,7 +105,7 @@ export default function CadastroScreen({ navigation }) {
           showsVerticalScrollIndicator={false}>
 
           <View style={styles.logoWrap}>
-            <LogoBlueTube width={200} height={58} />
+            <LogoBlueTube width={200} height={115} variant="stacked" tagline />
             <Text style={styles.sub}>Crie sua conta gratis</Text>
           </View>
 
