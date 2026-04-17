@@ -65,6 +65,13 @@ export const blueAPI = {
           const token = await getToken();
           return api(`blue-profile?token=${encodeURIComponent(token)}`);
     },
+    meusVideos: async () => {
+          const token = await getToken();
+          return api(`blue-profile?action=my-videos&token=${encodeURIComponent(token)}`);
+    },
+    videosDoUsuario: async (user_id) => {
+          return api(`blue-profile?action=user-videos&user_id=${encodeURIComponent(user_id)}`);
+    },
     seguir: async (following_id, follower_id) => {
           return api('blue-follow', { method: 'POST', body: JSON.stringify({ action: 'toggle', following_id, follower_id }) });
     },

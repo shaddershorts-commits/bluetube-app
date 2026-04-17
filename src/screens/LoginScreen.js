@@ -29,21 +29,53 @@ export default function LoginScreen({ navigation, route }) {
 
   const handleSubmit = async () => {
     if (!email || !password) { setError('Preencha email e senha'); return; }
+    if (mode === 'signup' && password.length < 6) { setError('A senha precisa ter ao menos 6 caracteres'); return; }
     setLoading(true); setError('');
     try {
       const d = mode === 'signin' ? await blueAPI.signin(email, password) : await blueAPI.signup(email, password);
       const token = d.session?.access_token || d.access_token;
       const refresh = d.session?.refresh_token;
-      if (!token) {
+
+      // Erro explicito do backend
+      if (d.error) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
-        setError(d.error || 'Erro ao autenticar');
+        const msg = typeof d.error === 'string' ? d.error : 'Erro ao autenticar';
+        // Traducoes rapidas pra mensagens Supabase comuns
+        if (/already.registered|already.exists|USER_ALREADY_EXISTS/i.test(msg)) {
+          setError('Este email já está cadastrado. Toque em "Entrar" para fazer login.');
+        } else if (/invalid.login|invalid.credentials/i.test(msg)) {
+          setError('Email ou senha incorretos');
+        } else if (/email.*confirm|not.confirmed/i.test(msg)) {
+          setError('Confirme seu email antes de entrar. Verifique sua caixa de entrada.');
+        } else {
+          setError(msg);
+        }
         setLoading(false);
         return;
       }
+
+      // Signup sem token = Supabase exige confirmacao de email (NAO eh erro)
+      if (!token && mode === 'signup') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        await SecureStore.setItemAsync(EMAIL_KEY, email).catch(() => {});
+        navigation.replace('OTP', { email, fromCadastro: true });
+        setLoading(false);
+        return;
+      }
+
+      // Signin sem token = erro generico
+      if (!token) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+        setError('Não foi possível entrar. Tente novamente.');
+        setLoading(false);
+        return;
+      }
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       await SecureStore.setItemAsync(EMAIL_KEY, email).catch(() => {});
+      if (refresh) await SecureStore.setItemAsync('bt_refresh_token', refresh).catch(() => {});
+      // setToken persiste em SecureStore internamente (bt_token)
       await setToken(token);
-      if (refresh) await SecureStore.setItemAsync('bt_refresh_token', refresh);
       setUser(d.session?.user || d.user);
     } catch (e) {
       setError('Erro de conexão');

@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Share, Animated, Pressable } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions, Share, Animated, Pressable } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,18 +11,28 @@ import Avatar from './Avatar';
 import ActionButton from './ActionButton';
 import blueAPI from '../api';
 
-const { width: W, height: H } = Dimensions.get('window');
 const DOUBLE_TAP_MS = 260;
 
-export default function VideoCard({ video, index }) {
+// Decide resizeMode baseado no aspect ratio (w/h):
+//   < 0.85 => portrait/vertical -> COVER (preenche a tela, como TikTok)
+//   >= 0.85 => square ou landscape -> CONTAIN (letterbox, nao corta)
+function pickResizeMode(w, h) {
+  if (!w || !h) return ResizeMode.COVER;
+  const aspect = w / h;
+  return aspect < 0.85 ? ResizeMode.COVER : ResizeMode.CONTAIN;
+}
+
+export default function VideoCard({ video, index, cardHeight }) {
   const currentIndex = useFeedStore((s) => s.currentIndex);
   const isActive = currentIndex === index;
   const videoRef = useRef(null);
   const nav = useNavigation();
+  const { width: W } = useWindowDimensions();
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
   const [likes, setLikes] = useState(video.likes || 0);
   const [muted, setMuted] = useState(false);
+  const [fitMode, setFitMode] = useState(() => pickResizeMode(video.width, video.height));
 
   const heartScale = useRef(new Animated.Value(0)).current;
   const heartOpacity = useRef(new Animated.Value(0)).current;
@@ -37,6 +47,15 @@ export default function VideoCard({ video, index }) {
       videoRef.current.pauseAsync().catch(() => {});
     }
   }, [isActive]);
+
+  // Quando o expo-av carrega o video, ele da a dimensao real via naturalSize.
+  // Usamos isso pra corrigir fit quando metadata do banco estiver faltando/errada.
+  const handleVideoLoad = (status) => {
+    const ns = status?.naturalSize;
+    if (ns && ns.width && ns.height) {
+      setFitMode(pickResizeMode(ns.width, ns.height));
+    }
+  };
 
   const flashHeart = () => {
     heartScale.setValue(0);
@@ -96,18 +115,20 @@ export default function VideoCard({ video, index }) {
   };
 
   const creator = video.creator || {};
+  const containerStyle = [styles.container, { width: W, height: cardHeight }];
 
   return (
-    <View style={styles.container}>
+    <View style={containerStyle}>
       <Pressable onPress={handleVideoPress} style={StyleSheet.absoluteFill}>
         <Video
           ref={videoRef}
           source={{ uri: video.video_url }}
           style={StyleSheet.absoluteFill}
-          resizeMode={ResizeMode.COVER}
+          resizeMode={fitMode}
           isLooping
           shouldPlay={isActive}
           isMuted={muted}
+          onLoad={handleVideoLoad}
         />
       </Pressable>
 
@@ -154,7 +175,7 @@ export default function VideoCard({ video, index }) {
 }
 
 const styles = StyleSheet.create({
-  container: { width: W, height: H - 60, backgroundColor: '#000' },
+  container: { backgroundColor: '#000' },
   gradient: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 300 },
   info: { position: 'absolute', bottom: 30, left: 16, right: 90 },
   username: { color: '#fff', fontWeight: '700', fontSize: 15, marginBottom: 8 },

@@ -1,7 +1,8 @@
 import { useEffect, useCallback, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Dimensions, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, useWindowDimensions } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useAuthStore, useFeedStore } from '../store';
 import VideoCard from '../components/VideoCard';
 import LivesBar from '../components/LivesBar';
@@ -11,15 +12,17 @@ import { COLORS } from '../constants';
 
 let _popupShownThisSession = false;
 
-const { height: H } = Dimensions.get('window');
-const TAB_H = 60;
-const CARD_H = H - TAB_H;
-
 export default function FeedScreen() {
   const { videos, addVideos, setVideos, cursor, setCursor, hasMore, setHasMore, isLoading, setLoading, setCurrentIndex } = useFeedStore();
   const user = useAuthStore((s) => s.user);
   const listRef = useRef(null);
   const insets = useSafeAreaInsets();
+  const { height: winH } = useWindowDimensions();
+  let tabH = 0;
+  try { tabH = useBottomTabBarHeight(); } catch (_) { tabH = 60; }
+  // Altura real disponivel pro card: viewport menos a tab bar (que ja inclui safe-area bottom).
+  // Sem isso, snapToInterval usa H-60 e desalinha em devices com gesture bar/notch.
+  const CARD_H = Math.max(1, Math.round(winH - tabH));
   const [showPopup, setShowPopup] = useState(false);
 
   useEffect(() => {
@@ -84,12 +87,13 @@ export default function FeedScreen() {
         ref={listRef}
         data={videos}
         keyExtractor={(item) => item.id}
-        renderItem={({ item, index }) => <VideoCard video={item} index={index} />}
+        renderItem={({ item, index }) => <VideoCard video={item} index={index} cardHeight={CARD_H} />}
         estimatedItemSize={CARD_H}
         snapToInterval={CARD_H}
         snapToAlignment="start"
         decelerationRate="fast"
         disableIntervalMomentum
+        pagingEnabled
         showsVerticalScrollIndicator={false}
         onEndReached={() => hasMore && loadFeed(false)}
         onEndReachedThreshold={2}
