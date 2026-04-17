@@ -36,12 +36,15 @@ export default {
                             'VIBRATE',
                           ],
           },
+          // @sentry/react-native/expo plugin removido temporariamente —
+          // faltava config organization/project e provavelmente quebrava
+          // o gradle no upload de sourcemaps. O SDK JS (@sentry/react-native)
+          // continua capturando erros em runtime normalmente.
           plugins: [
                   'expo-camera',
                   'expo-media-library',
                   'expo-notifications',
                   'expo-av',
-                  '@sentry/react-native/expo',
                 ],
           extra: {
                   supabaseUrl: process.env.SUPABASE_URL || 'https://pokpfvjrccviwgguwuck.supabase.co',
