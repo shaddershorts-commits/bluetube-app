@@ -49,8 +49,7 @@
     "zustand": "^5.0.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.25.0",
-    "sharp": "^0.34.5"
+    "@babel/core": "^7.25.0"
   },
   "private": true
 }

@@ -1,5 +1,11 @@
 // Gera assets/splash.png a partir de um SVG que reproduz a logo BlueTube.
 // Fundo escuro (#020817), logo centralizada verticalmente, dimensao 1284x2778 (portrait iOS).
+//
+// NOTA: sharp NAO eh mais devDependency do projeto porque EAS Build (container Linux)
+// falhava com binarios nativos dele. Pra rodar este script, instale temporariamente:
+//   npm install sharp --no-save
+//   node scripts/generate-splash.js
+// Depois o assets/splash.png fica commitado e sharp nao eh mais necessario.
 const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
