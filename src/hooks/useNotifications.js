@@ -1,7 +1,10 @@
 import { useEffect } from 'react';
 import * as Notifications from 'expo-notifications';
 import * as Linking from 'expo-linking';
+import * as SecureStore from 'expo-secure-store';
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
+import { API_BASE } from '../constants';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -34,5 +37,27 @@ async function register() {
         lightColor: '#1a6bff',
       });
     }
+
+    const projectId =
+      Constants.expoConfig?.extra?.eas?.projectId ||
+      Constants.easConfig?.projectId;
+    const tokenResp = await Notifications.getExpoPushTokenAsync(
+      projectId ? { projectId } : undefined
+    );
+    const expoPushToken = tokenResp?.data;
+    if (!expoPushToken) return;
+
+    const userToken = await SecureStore.getItemAsync('bt_token');
+    if (!userToken) return;
+
+    await fetch(`${API_BASE}/push-register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token: userToken,
+        expo_push_token: expoPushToken,
+        platform: Platform.OS,
+      }),
+    });
   } catch {}
 }
