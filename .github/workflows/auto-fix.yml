@@ -160,14 +160,15 @@ jobs:
           fi
           CAN=$(node -e "const f=require('/tmp/fix.json');console.log(f.pode_corrigir && !f.requer_revisao_humana)")
           echo "can_apply=$CAN" >> $GITHUB_OUTPUT
-          # Requer aprovação se: Claude pode aplicar MAS severidade=critical
-          if [ "$CAN" = "true" ] && [ "$SEVERITY" = "critical" ]; then
+          # Regra de segurança: só auto-aplica fixes para bugs de severidade baixa.
+          # medium/high/critical sempre requerem aprovação manual via GitHub Issue.
+          if [ "$CAN" = "true" ] && [ "$SEVERITY" != "low" ]; then
             echo "needs_approval=true" >> $GITHUB_OUTPUT
           else
             echo "needs_approval=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Aguardar aprovação humana (bugs críticos)
+      - name: Aguardar aprovação humana (severidade ≠ low)
         if: steps.decide.outputs.needs_approval == 'true'
         uses: trstringer/manual-approval@v1
         timeout-minutes: 60
@@ -175,13 +176,14 @@ jobs:
           secret: ${{ secrets.GH_TOKEN }}
           approvers: shaddershorts-commits
           minimum-approvals: 1
-          issue-title: "🤖 Fix crítico aguardando aprovação: ${{ env.ERROR_MESSAGE }}"
+          issue-title: "🤖 Fix aguardando aprovação [${{ env.SEVERITY }}]: ${{ env.ERROR_MESSAGE }}"
           issue-body: |
             **Erro:** ${{ env.ERROR_MESSAGE }}
             **Arquivo:** `${{ env.FILE_PATH }}`
             **Severidade:** ${{ env.SEVERITY }}
 
-            Claude gerou fix automático mas severidade é `critical` — precisa do seu OK.
+            Claude gerou fix automático. Por regra de segurança, apenas bugs
+            `severity=low` são auto-aplicados — este precisa do seu OK.
 
             Responda **approve** pra aplicar o fix + commit + OTA,
             ou **deny** pra rejeitar e abrir pra revisão manual.
