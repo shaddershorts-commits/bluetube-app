@@ -1,5 +1,17 @@
-import * as Sentry from '@sentry/react-native';
 import Constants from 'expo-constants';
+
+// Expo Go não carrega módulos nativos do Sentry. Detecta e vira no-op.
+const isExpoGo = Constants.executionEnvironment === 'storeClient';
+
+// Lazy-load Sentry só fora do Expo Go (import estático quebra Expo Go).
+let Sentry = null;
+if (!isExpoGo) {
+  try {
+    Sentry = require('@sentry/react-native');
+  } catch (e) {
+    // Módulo nativo ausente — segue sem Sentry
+  }
+}
 
 // DSN vem via app.config.js → Constants.expoConfig.extra.sentryDsn
 // (process.env não existe em runtime no Expo — tem que passar pelo extra).
@@ -9,7 +21,7 @@ const RELEASE = Constants.expoConfig?.version || '1.0.0';
 let _initialized = false;
 
 export function initSentry() {
-  if (_initialized) return;
+  if (_initialized || !Sentry) return;
   if (!DSN) {
     if (__DEV__) console.log('[sentry] DSN vazio — Sentry desativado');
     return;
@@ -71,6 +83,6 @@ export function addBreadcrumb(message, category = 'app', data = {}) {
 }
 
 export function wrap(App) {
-  // Sentry.wrap é seguro de chamar mesmo quando DSN está vazio
-  return Sentry.wrap ? Sentry.wrap(App) : App;
+  if (!Sentry || !Sentry.wrap) return App;
+  return Sentry.wrap(App);
 }
