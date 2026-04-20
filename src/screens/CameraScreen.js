@@ -40,16 +40,15 @@ export default function CameraScreen() {
   const saveAndPublish = async () => {
     if (!videoUri) return;
     setSaving(true);
+    // Salvar na galeria é opcional — publicação é o fluxo principal
     try {
       const perm = await MediaLibrary.requestPermissionsAsync();
-      if (perm.granted) {
-        await MediaLibrary.saveToLibraryAsync(videoUri);
-        Alert.alert('✅ Vídeo salvo na galeria', 'Em breve você poderá publicar diretamente do app.');
-      }
-    } catch (e) { Alert.alert('Erro', e.message); }
+      if (perm.granted) MediaLibrary.saveToLibraryAsync(videoUri).catch(() => {});
+    } catch (e) {}
     setSaving(false);
+    const uri = videoUri;
     setVideoUri(null);
-    nav.goBack();
+    nav.navigate('PostVideo', { videoUri: uri, duration: mode });
   };
 
   if (!camPerm) return <View style={styles.center}><ActivityIndicator color="#fff" /></View>;
@@ -79,7 +78,7 @@ export default function CameraScreen() {
           <Text style={styles.previewIcon}>✅</Text>
           <Text style={styles.previewText}>Vídeo gravado com sucesso!</Text>
           <TouchableOpacity style={styles.publishBtn} onPress={saveAndPublish} disabled={saving}>
-            {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.publishBtnText}>Salvar e publicar →</Text>}
+            {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.publishBtnText}>Continuar →</Text>}
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setVideoUri(null)}>
             <Text style={styles.discard}>Gravar novamente</Text>

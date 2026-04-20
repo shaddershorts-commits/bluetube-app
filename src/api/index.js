@@ -1,4 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
+import * as FileSystem from 'expo-file-system';
+import * as VideoThumbnails from 'expo-video-thumbnails';
 import { API_BASE } from '../constants';
 import { addBreadcrumb, captureError } from '../utils/sentry';
 
@@ -140,6 +142,122 @@ export const blueAPI = {
     monetizacaoStatus: async () => {
           const token = await getToken();
           return api(`blue-monetizacao?action=status&token=${encodeURIComponent(token)}`);
+    },
+
+    // Upload de video — fluxo 2-step:
+    //   1) POST /api/blue-upload com metadata + thumbnail base64 -> recebe storage_path + creds
+    //   2) PUT direto no Supabase Storage com o arquivo mp4/mov
+    publicarVideo: async (videoUri, { titulo, descricao = '', duration = 30, onProgress } = {}) => {
+          const token = await getToken();
+          if (!token) return { error: 'Login necessario' };
+          if (!videoUri) return { error: 'Video invalido' };
+
+          addBreadcrumb('publicarVideo:start', 'upload', { duration });
+
+          // File info
+          let fileInfo;
+          try {
+                fileInfo = await FileSystem.getInfoAsync(videoUri);
+          } catch (e) {
+                captureError(e, { step: 'file-info' });
+                return { error: 'Nao consegui ler o arquivo do video' };
+          }
+          if (!fileInfo?.exists) return { error: 'Arquivo nao encontrado' };
+
+          const ext = (videoUri.split('.').pop() || 'mp4').toLowerCase();
+          const contentType = ext === 'mov' ? 'video/quicktime' : ext === 'webm' ? 'video/webm' : 'video/mp4';
+
+          // Thumbnail base64 (nao bloqueante se falhar — backend aceita null)
+          let thumbnail_data = null;
+          try {
+                const { uri: thumbUri } = await VideoThumbnails.getThumbnailAsync(videoUri, {
+                      time: Math.min(1000, (duration * 1000) / 4),
+                      quality: 0.7,
+                });
+                const thumbB64 = await FileSystem.readAsStringAsync(thumbUri, {
+                      encoding: FileSystem.EncodingType.Base64,
+                });
+                thumbnail_data = `data:image/jpeg;base64,${thumbB64}`;
+          } catch (e) {
+                // segue sem thumbnail — backend gera depois pelo Cloudflare Stream
+          }
+
+          // Step 1: registra metadata
+          const metaResp = await api('blue-upload', {
+                method: 'POST',
+                body: JSON.stringify({
+                      token,
+                      title: titulo,
+                      description: descricao,
+                      duration,
+                      width: 1080,
+                      height: 1920,
+                      file_name: `video.${ext}`,
+                      content_type: contentType,
+                      file_size: fileInfo.size,
+                      thumbnail_data,
+                }),
+          });
+          if (metaResp?.error) {
+                captureError(new Error(metaResp.error), { step: 'metadata', status: metaResp.status });
+                return { error: metaResp.error };
+          }
+          if (!metaResp?.ok || !metaResp?.storage_path) {
+                return { error: 'Resposta invalida do servidor' };
+          }
+
+          // Step 2: upload binario direto pro Supabase Storage
+          const uploadUrl = `${metaResp.supabase_url}/storage/v1/object/blue-videos/${metaResp.storage_path}`;
+          const uploadTask = FileSystem.createUploadTask(
+                uploadUrl,
+                videoUri,
+                {
+                      httpMethod: 'POST',
+                      uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+                      headers: {
+                            apikey: metaResp.anon_key,
+                            Authorization: `Bearer ${metaResp.user_token}`,
+                            'Content-Type': contentType,
+                            'x-upsert': 'true',
+                      },
+                },
+                (p) => {
+                      if (onProgress && p.totalBytesExpectedToSend > 0) {
+                            onProgress(p.totalBytesSent / p.totalBytesExpectedToSend);
+                      }
+                }
+          );
+
+          try {
+                const uploadRes = await uploadTask.uploadAsync();
+                if (uploadRes.status >= 400) {
+                      captureError(new Error('upload_failed'), { status: uploadRes.status, body: uploadRes.body?.slice(0, 200) });
+                      return { error: `Falha no upload (HTTP ${uploadRes.status})` };
+                }
+          } catch (e) {
+                captureError(e, { step: 'storage-upload' });
+                return { error: e.message || 'Falha no upload' };
+          }
+
+          if (onProgress) onProgress(1);
+          addBreadcrumb('publicarVideo:ok', 'upload', { video_id: metaResp.video?.id });
+          return { ok: true, video: metaResp.video };
+    },
+
+    // Edit perfil — PATCH em blue-profile
+    atualizarPerfil: async ({ display_name, bio, avatar_url } = {}) => {
+          const token = await getToken();
+          if (!token) return { error: 'Login necessario' };
+          return api('blue-profile', {
+                method: 'POST',
+                body: JSON.stringify({
+                      action: 'atualizar',
+                      token,
+                      ...(display_name !== undefined && { display_name }),
+                      ...(bio !== undefined && { bio }),
+                      ...(avatar_url !== undefined && { avatar_url }),
+                }),
+          });
     },
 };
 

@@ -21,6 +21,7 @@ import ConversaScreen from '../screens/ConversaScreen';
 import PerfilUsuarioScreen from '../screens/PerfilUsuarioScreen';
 import ComentariosScreen from '../screens/ComentariosScreen';
 import LiveScreen from '../screens/LiveScreen';
+import PostVideoScreen from '../screens/PostVideoScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -113,6 +114,7 @@ export default function Navigation() {
                        <Stack.Screen name="PerfilUsuario" component={PerfilUsuarioScreen} />
                        <Stack.Screen name="Comentarios" component={ComentariosScreen} />
                        <Stack.Screen name="Live" component={LiveScreen} />
+                       <Stack.Screen name="PostVideo" component={PostVideoScreen} />
            </>
          )}
 </Stack.Navigator>
