@@ -74,8 +74,28 @@ export const blueAPI = {
     videosDoUsuario: async (user_id) => {
           return api(`blue-profile?action=user-videos&user_id=${encodeURIComponent(user_id)}`);
     },
-    seguir: async (following_id, follower_id) => {
-          return api('blue-follow', { method: 'POST', body: JSON.stringify({ action: 'toggle', following_id, follower_id }) });
+    // Seguir / deixar de seguir um user. Backend descobre follower_id via token.
+    seguir: async (target_id) => {
+          const token = await getToken();
+          if (!token) return { error: 'Login necessario' };
+          return api('blue-follow', {
+                method: 'POST',
+                body: JSON.stringify({ action: 'follow', token, target_id }),
+          });
+    },
+    deixarDeSeguir: async (target_id) => {
+          const token = await getToken();
+          if (!token) return { error: 'Login necessario' };
+          return api('blue-follow', {
+                method: 'POST',
+                body: JSON.stringify({ action: 'unfollow', token, target_id }),
+          });
+    },
+    // Retorna { following: boolean } — sigo esse user?
+    estouSeguindo: async (user_id) => {
+          const token = await getToken();
+          if (!token) return { following: false };
+          return api(`blue-follow?action=is-following&user_id=${encodeURIComponent(user_id)}&token=${encodeURIComponent(token)}`);
     },
     // TODO: blue-profile.js precisa ter action=sugestoes-seguir
     sugestoesSeguir: async () => {
