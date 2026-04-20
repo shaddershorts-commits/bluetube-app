@@ -63,6 +63,7 @@ export const blueAPI = {
 
     // Perfil
     perfil: async (user_id) => api(`blue-profile?user_id=${user_id}`),
+    perfilPorUsername: async (username) => api(`blue-profile?username=${encodeURIComponent(username)}`),
     meuPerfil: async () => {
           const token = await getToken();
           return api(`blue-profile?token=${encodeURIComponent(token)}`);

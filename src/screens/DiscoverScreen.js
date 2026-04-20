@@ -1,10 +1,13 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import Header from '../components/Header';
 import blueAPI from '../api';
 import { COLORS } from '../constants';
 
 export default function DiscoverScreen() {
+  const nav = useNavigation();
   const [hashtags, setHashtags] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -27,12 +30,17 @@ export default function DiscoverScreen() {
           <Text style={styles.empty}>Nenhuma hashtag em alta ainda.</Text>
         ) : (
           hashtags.map((t, i) => (
-            <TouchableOpacity key={t.id || i} style={styles.item}>
+            <TouchableOpacity
+              key={t.id || i}
+              style={styles.item}
+              activeOpacity={0.7}
+              onPress={() => nav.navigate('Hashtag', { tag: t.nome })}>
               <Text style={styles.rank}>{i + 1}</Text>
               <View style={{ flex: 1 }}>
                 <Text style={styles.tag}>#{t.nome}{t.trending ? ' 🔥' : ''}</Text>
                 <Text style={styles.usos}>{t.usos} vídeos</Text>
               </View>
+              <Ionicons name="chevron-forward" size={18} color={COLORS.textDim} />
             </TouchableOpacity>
           ))
         )}

@@ -16,7 +16,8 @@ function formatCount(n) {
 }
 
 export default function PerfilUsuarioScreen({ route }) {
-  const { user_id } = route.params || {};
+  // Deep link /blue/@:username passa { username }; navegacao interna passa { user_id }
+  const { user_id: paramUserId, username: paramUsername } = route.params || {};
   const { width: W } = useWindowDimensions();
   const [profile, setProfile] = useState(null);
   const [videos, setVideos] = useState([]);
@@ -29,22 +30,34 @@ export default function PerfilUsuarioScreen({ route }) {
     let cancelled = false;
     (async () => {
       try {
-        const [pr, vr, fr] = await Promise.all([
-          blueAPI.perfil(user_id).catch(() => null),
-          blueAPI.videosDoUsuario(user_id).catch(() => null),
-          blueAPI.estouSeguindo(user_id).catch(() => ({ following: false })),
+        // Resolve perfil por user_id OU username (deep link)
+        const pr = paramUserId
+          ? await blueAPI.perfil(paramUserId).catch(() => null)
+          : paramUsername
+          ? await blueAPI.perfilPorUsername(paramUsername).catch(() => null)
+          : null;
+        const p = (pr && (pr.profile || pr)) || null;
+        if (cancelled) return;
+        setProfile(p);
+
+        if (!p?.user_id) {
+          setLoading(false);
+          return;
+        }
+
+        const [vr, fr] = await Promise.all([
+          blueAPI.videosDoUsuario(p.user_id).catch(() => null),
+          blueAPI.estouSeguindo(p.user_id).catch(() => ({ following: false })),
         ]);
         if (cancelled) return;
-        const p = (pr && (pr.profile || pr)) || null;
-        setProfile(p);
         setVideos((vr && vr.videos) || []);
         setIsFollowing(!!fr?.following);
-        setFollowerCount(p?.seguidores || 0);
+        setFollowerCount(p.seguidores || 0);
       } catch {}
       if (!cancelled) setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [user_id]);
+  }, [paramUserId, paramUsername]);
 
   const toggleFollow = useCallback(async () => {
     if (followBusy || !profile?.user_id) return;

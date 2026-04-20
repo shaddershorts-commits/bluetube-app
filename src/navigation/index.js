@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { Linking as RNLinking } from 'react-native';
+import * as Linking from 'expo-linking';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -23,6 +25,7 @@ import ComentariosScreen from '../screens/ComentariosScreen';
 import LiveScreen from '../screens/LiveScreen';
 import PostVideoScreen from '../screens/PostVideoScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
+import HashtagScreen from '../screens/HashtagScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -36,6 +39,54 @@ const NAV_THEME = {
           text: COLORS.text,
           primary: COLORS.neon,
           border: COLORS.border,
+    },
+};
+
+// Deep linking config — suporta:
+//   bluetube://               -> Feed (tab default)
+//   https://bluetubeviral.com/blue              -> Feed
+//   https://bluetubeviral.com/blue/@username    -> PerfilUsuario{username}
+//   https://bluetubeviral.com/blue/hashtag/foo  -> Hashtag{tag}
+//   https://bluetubeviral.com/blue/v/:id        -> fallback web (abre browser)
+// /blue/v/:id nao tem tela nativa ainda — tratado via listener mais abaixo.
+const linking = {
+    prefixes: ['bluetube://', 'https://bluetubeviral.com', 'http://bluetubeviral.com'],
+    config: {
+          screens: {
+                Main: {
+                      screens: {
+                            Feed: 'blue',
+                            Descobrir: 'blue/descobrir',
+                      },
+                },
+                PerfilUsuario: {
+                      path: 'blue/@:username',
+                      parse: { username: (u) => u },
+                },
+                Hashtag: {
+                      path: 'blue/hashtag/:tag',
+                      parse: { tag: (t) => decodeURIComponent(t) },
+                },
+          },
+    },
+    // /blue/v/:id nao mapeia pra tela nativa — abre no navegador externo
+    async getInitialURL() {
+          const url = await RNLinking.getInitialURL();
+          if (url && /\/blue\/v\/[^/?#]+/.test(url)) {
+                RNLinking.openURL(url).catch(() => {});
+                return null;
+          }
+          return url;
+    },
+    subscribe(listener) {
+          const sub = RNLinking.addEventListener('url', ({ url }) => {
+                if (/\/blue\/v\/[^/?#]+/.test(url)) {
+                      RNLinking.openURL(url).catch(() => {});
+                      return;
+                }
+                listener(url);
+          });
+          return () => sub.remove();
     },
 };
 
@@ -98,7 +149,7 @@ export default function Navigation() {
   }
 
   return (
-        <NavigationContainer theme={NAV_THEME}>
+        <NavigationContainer theme={NAV_THEME} linking={linking}>
           <Stack.Navigator screenOptions={{ headerShown: false }}>
 {!token ? (
             <>
@@ -117,6 +168,7 @@ export default function Navigation() {
                        <Stack.Screen name="Live" component={LiveScreen} />
                        <Stack.Screen name="PostVideo" component={PostVideoScreen} />
                        <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+                       <Stack.Screen name="Hashtag" component={HashtagScreen} />
            </>
          )}
 </Stack.Navigator>

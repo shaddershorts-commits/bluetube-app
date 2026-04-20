@@ -35,6 +35,25 @@ export default {
                             'WRITE_EXTERNAL_STORAGE',
                             'VIBRATE',
                           ],
+                  // Deep links: captura https://bluetubeviral.com/blue/* e bluetube://
+                  // autoVerify: true exige assetlinks.json em /.well-known/assetlinks.json
+                  // do dominio (ja provisionado no repo web do bluetube).
+                  intentFilters: [
+                            {
+                                      action: 'VIEW',
+                                      autoVerify: true,
+                                      data: [
+                                                { scheme: 'https', host: 'bluetubeviral.com', pathPrefix: '/blue' },
+                                                { scheme: 'http',  host: 'bluetubeviral.com', pathPrefix: '/blue' },
+                                      ],
+                                      category: ['BROWSABLE', 'DEFAULT'],
+                            },
+                            {
+                                      action: 'VIEW',
+                                      data: [{ scheme: 'bluetube' }],
+                                      category: ['BROWSABLE', 'DEFAULT'],
+                            },
+                  ],
           },
           // @sentry/react-native/expo plugin removido temporariamente —
           // faltava config organization/project e provavelmente quebrava
