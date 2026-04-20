@@ -124,7 +124,7 @@ export default function ProfileScreen() {
 
           {/* Botoes de acao */}
           <View style={styles.actionRow}>
-            <TouchableOpacity style={[styles.actionBtn, styles.actionBtnPrimary]} onPress={() => Alert.alert('Em breve', 'Edição de perfil em construção. Por enquanto use o site.')}>
+            <TouchableOpacity style={[styles.actionBtn, styles.actionBtnPrimary]} onPress={() => nav.navigate('EditProfile')}>
               <Text style={styles.actionBtnText}>Editar perfil</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.actionBtnSquare} onPress={() => nav.navigate('Chat')}>
@@ -180,7 +180,7 @@ export default function ProfileScreen() {
         <Pressable style={styles.menuBackdrop} onPress={() => setMenuOpen(false)}>
           <Pressable style={[styles.menuSheet, { paddingBottom: insets.bottom + 12 }]}>
             <View style={styles.menuHandle} />
-            <MenuItem icon="person-outline" label="Editar perfil" onPress={() => { setMenuOpen(false); Alert.alert('Em breve', 'Edição no app em construção'); }} />
+            <MenuItem icon="person-outline" label="Editar perfil" onPress={() => { setMenuOpen(false); nav.navigate('EditProfile'); }} />
             <MenuItem icon="bookmark-outline" label="Salvos" onPress={() => { setMenuOpen(false); Alert.alert('Em breve', 'Lista de salvos em construção'); }} />
             <MenuItem icon="notifications-outline" label="Notificações" onPress={() => { setMenuOpen(false); nav.navigate('Chat'); }} />
             <MenuItem

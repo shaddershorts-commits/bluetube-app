@@ -244,18 +244,24 @@ export const blueAPI = {
           return { ok: true, video: metaResp.video };
     },
 
-    // Edit perfil — PATCH em blue-profile
-    atualizarPerfil: async ({ display_name, bio, avatar_url } = {}) => {
+    // Edit perfil — action=update em blue-profile
+    //   display_name: max 50 chars
+    //   bio:          max 150 chars
+    //   username:     lowercase a-z0-9_. (sluggified no backend), min 3 chars
+    //   avatar_data:  data:image/jpeg;base64,... (max 2MB). Backend faz upload
+    //                 pro Supabase Storage e devolve avatar_url.
+    atualizarPerfil: async ({ display_name, bio, username, avatar_data } = {}) => {
           const token = await getToken();
           if (!token) return { error: 'Login necessario' };
           return api('blue-profile', {
                 method: 'POST',
                 body: JSON.stringify({
-                      action: 'atualizar',
+                      action: 'update',
                       token,
                       ...(display_name !== undefined && { display_name }),
                       ...(bio !== undefined && { bio }),
-                      ...(avatar_url !== undefined && { avatar_url }),
+                      ...(username !== undefined && { username }),
+                      ...(avatar_data !== undefined && { avatar_data }),
                 }),
           });
     },
