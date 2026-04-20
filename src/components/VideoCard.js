@@ -38,14 +38,32 @@ export default function VideoCard({ video, index, cardHeight }) {
   const heartOpacity = useRef(new Animated.Value(0)).current;
   const lastTapRef = useRef(0);
 
+  // Autoplay robusto em mobile: se o device bloquear play com audio
+  // (algumas versoes de Android/iOS em low-power ou com some restricoes
+  // de media session), retenta mutado. Mesma cascata do web:
+  // fix(blue): autoplay mobile robusto — play -> muted -> canplay
   useEffect(() => {
     if (!videoRef.current) return;
+    let cancelled = false;
     if (isActive) {
-      videoRef.current.playAsync().catch(() => {});
-      blueAPI.interact('view', video.id).catch(() => {});
+      (async () => {
+        try {
+          await videoRef.current.playAsync();
+          if (!cancelled) blueAPI.interact('view', video.id).catch(() => {});
+        } catch (e) {
+          // Fallback: muta e tenta de novo
+          try {
+            await videoRef.current.setIsMutedAsync(true);
+            if (!cancelled) setMuted(true);
+            await videoRef.current.playAsync();
+            if (!cancelled) blueAPI.interact('view', video.id).catch(() => {});
+          } catch (_) {}
+        }
+      })();
     } else {
       videoRef.current.pauseAsync().catch(() => {});
     }
+    return () => { cancelled = true; };
   }, [isActive]);
 
   // Quando o expo-av carrega o video, ele da a dimensao real via naturalSize.
