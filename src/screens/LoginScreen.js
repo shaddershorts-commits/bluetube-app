@@ -107,7 +107,7 @@ export default function LoginScreen({ navigation, route }) {
       <StatusBar style="light" />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.container}>
         <View style={styles.logoWrap}>
-          <LogoBlueTube width={220} height={126} variant="stacked" tagline />
+          <LogoBlueTube width={220} height={110} variant="stacked" />
           <Text style={styles.sub}>A nova rede social de vídeos do Brasil</Text>
         </View>
 

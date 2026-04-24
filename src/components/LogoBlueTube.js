@@ -2,19 +2,21 @@ import Svg, { Path, Rect, Defs, LinearGradient, Stop, Text as SvgText } from 're
 
 // Logo BlueTube.
 // - variant 'inline' (default): [▶] BlueTube em uma unica linha (compacto).
-// - variant 'stacked': play box a esquerda, "Blue" em cima e "Tube" embaixo,
-//   com tagline opcional "CRIADOR VIRAL" — mesmo layout do splash/site.
+// - variant 'stacked': play box a esquerda, "Blue" em cima e "Tube" embaixo.
+// Prop `tagline` (deprecated, mantida pra retrocompat): texto "CRIADOR VIRAL"
+// no SVG ficava cortado em telas estreitas, foi removido em 2026-04-24.
 export default function LogoBlueTube({
   width = 160,
   height = 48,
   showText = true,
   variant = 'inline',
-  tagline = false,
+  tagline = false, // eslint-disable-line no-unused-vars
 }) {
   if (variant === 'stacked') {
-    // viewBox 260x150 — play box 130x130 a esquerda, textos empilhados a direita
+    // viewBox 260x130 — play box 120x120 a esquerda, textos empilhados a direita
+    // (height ajustado de 150 -> 130 ja que tagline foi removida)
     return (
-      <Svg width={width} height={height} viewBox="0 0 260 150">
+      <Svg width={width} height={height} viewBox="0 0 260 130">
         <Defs>
           <LinearGradient id="btGrad" x1="0" y1="0" x2="1" y2="1">
             <Stop offset="0" stopColor="#00c2ff" />
@@ -26,18 +28,13 @@ export default function LogoBlueTube({
             <Stop offset="1" stopColor="#0aa9ff" />
           </LinearGradient>
         </Defs>
-        <Rect x="6" y="14" width="120" height="120" rx="28" fill="url(#btGrad)" />
-        <Rect x="12" y="20" width="108" height="108" rx="22" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="2" />
-        <Path d="M 52 46 L 96 74 L 52 102 Z" fill="#ffffff" />
+        <Rect x="6" y="5" width="120" height="120" rx="28" fill="url(#btGrad)" />
+        <Rect x="12" y="11" width="108" height="108" rx="22" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="2" />
+        <Path d="M 52 37 L 96 65 L 52 93 Z" fill="#ffffff" />
         {showText && (
           <>
-            <SvgText x="140" y="62" fontSize="46" fontWeight="900" fill="#ffffff">Blue</SvgText>
-            <SvgText x="140" y="110" fontSize="46" fontWeight="900" fill="url(#btTubeGrad)">Tube</SvgText>
-            {tagline && (
-              <SvgText x="140" y="134" fontSize="13" fontWeight="700" fill="#1a8fd6" letterSpacing="4">
-                CRIADOR VIRAL
-              </SvgText>
-            )}
+            <SvgText x="140" y="53" fontSize="46" fontWeight="900" fill="#ffffff">Blue</SvgText>
+            <SvgText x="140" y="101" fontSize="46" fontWeight="900" fill="url(#btTubeGrad)">Tube</SvgText>
           </>
         )}
       </Svg>

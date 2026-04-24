@@ -1,5 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { View, Animated, Easing, StyleSheet, Dimensions } from 'react-native';
+import Reanimated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withSequence,
+  withTiming,
+  Easing as REasing,
+} from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { COLORS } from '../constants';
@@ -42,6 +50,23 @@ export default function SplashScreen({ onFinish }) {
   const taglineY = useRef(new Animated.Value(20)).current;
   const taglineOpacity = useRef(new Animated.Value(0)).current;
 
+  // Reanimated: pulse continuo na logo apos a entrada (loop infinito).
+  // Cria sensacao de "vida" no splash, fica bonito + menos estatico.
+  const pulse = useSharedValue(1);
+  useEffect(() => {
+    pulse.value = withRepeat(
+      withSequence(
+        withTiming(1.04, { duration: 1400, easing: REasing.inOut(REasing.quad) }),
+        withTiming(1.00, { duration: 1400, easing: REasing.inOut(REasing.quad) })
+      ),
+      -1, // infinito
+      true // reverso
+    );
+  }, []);
+  const pulseStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulse.value }],
+  }));
+
   useEffect(() => {
     const anim = Animated.sequence([
       Animated.parallel([
@@ -71,7 +96,9 @@ export default function SplashScreen({ onFinish }) {
       <StatusBar style="light" translucent backgroundColor="transparent" />
       {particles.map((p) => <Particle {...p} />)}
       <Animated.View style={{ transform: [{ scale: logoScale }], opacity: logoOpacity }}>
-        <LogoBlueTube width={260} height={150} variant="stacked" tagline />
+        <Reanimated.View style={pulseStyle}>
+          <LogoBlueTube width={260} height={130} variant="stacked" />
+        </Reanimated.View>
       </Animated.View>
       <Animated.Text
         style={[styles.tagline, { opacity: taglineOpacity, transform: [{ translateY: taglineY }] }]}
