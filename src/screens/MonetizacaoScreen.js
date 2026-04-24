@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Header from '../components/Header';
+import GlassCard from '../components/GlassCard';
 import blueAPI from '../api';
 import { COLORS } from '../constants';
 
@@ -57,18 +58,20 @@ export default function MonetizacaoScreen() {
         </View>
 
         {/* Status conta */}
-        <View style={styles.statusBox}>
-          <Ionicons
-            name={temConta ? 'checkmark-circle' : 'alert-circle'}
-            size={20}
-            color={temConta ? '#10b981' : '#f59e0b'}
-          />
-          <Text style={styles.statusText}>
-            {temConta
-              ? 'Conta de saque configurada'
-              : 'Configure sua conta pra receber pagamentos'}
-          </Text>
-        </View>
+        <GlassCard style={styles.statusBoxWrap} padded={false}>
+          <View style={styles.statusBox}>
+            <Ionicons
+              name={temConta ? 'checkmark-circle' : 'alert-circle'}
+              size={20}
+              color={temConta ? '#10b981' : '#f59e0b'}
+            />
+            <Text style={styles.statusText}>
+              {temConta
+                ? 'Conta de saque configurada'
+                : 'Configure sua conta pra receber pagamentos'}
+            </Text>
+          </View>
+        </GlassCard>
 
         {/* CTA — abre versao web pra saque (mais robusto que portar todo fluxo Stripe Connect/Asaas pro nativo) */}
         <TouchableOpacity
@@ -100,12 +103,8 @@ const styles = StyleSheet.create({
   saldoLabel: { color: '#10b981', fontSize: 11, fontWeight: '700', letterSpacing: 1.2, marginBottom: 8 },
   saldoValor: { color: '#10b981', fontSize: 36, fontWeight: '800' },
   saldoSubtext: { color: COLORS.textSecondary, fontSize: 12, marginTop: 10 },
-  statusBox: {
-    marginHorizontal: 16, padding: 14, borderRadius: 10,
-    backgroundColor: COLORS.surface,
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
-  },
+  statusBoxWrap: { marginHorizontal: 16 },
+  statusBox: { padding: 14, flexDirection: 'row', alignItems: 'center', gap: 10 },
   statusText: { color: COLORS.text, fontSize: 13, flex: 1 },
   ctaBtn: {
     marginHorizontal: 16, marginTop: 18,

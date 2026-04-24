@@ -4,8 +4,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Header from '../components/Header';
+import GlassCard from '../components/GlassCard';
 import blueAPI from '../api';
 import { COLORS } from '../constants';
+import { colors as theme, radius, space } from '../constants/theme';
 
 function formatCount(n) {
   if (!n || n < 1000) return String(n || 0);
@@ -15,13 +17,15 @@ function formatCount(n) {
 
 function StatCard({ icon, label, value, color }) {
   return (
-    <View style={styles.card}>
-      <View style={[styles.cardIcon, { backgroundColor: color + '22' }]}>
-        <Ionicons name={icon} size={20} color={color} />
+    <GlassCard style={styles.cardWrap} padded={false}>
+      <View style={styles.cardInner}>
+        <View style={[styles.cardIcon, { backgroundColor: color + '22' }]}>
+          <Ionicons name={icon} size={20} color={color} />
+        </View>
+        <Text style={styles.cardValue}>{value}</Text>
+        <Text style={styles.cardLabel}>{label}</Text>
       </View>
-      <Text style={styles.cardValue}>{value}</Text>
-      <Text style={styles.cardLabel}>{label}</Text>
-    </View>
+    </GlassCard>
   );
 }
 
@@ -124,11 +128,8 @@ export default function AnalyticsScreen() {
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   cardsRow: { flexDirection: 'row', paddingHorizontal: 12, gap: 10, marginTop: 12 },
-  card: {
-    flex: 1, backgroundColor: COLORS.surface, borderRadius: 14,
-    padding: 16, alignItems: 'flex-start',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
-  },
+  cardWrap: { flex: 1 },
+  cardInner: { padding: 16, alignItems: 'flex-start' },
   cardIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
   cardValue: { color: COLORS.text, fontSize: 22, fontWeight: '800' },
   cardLabel: { color: COLORS.textSecondary, fontSize: 12, marginTop: 2 },

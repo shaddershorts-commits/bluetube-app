@@ -5,6 +5,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import Header from '../components/Header';
+import GlassCard from '../components/GlassCard';
 import { useAuthStore } from '../store';
 import { COLORS } from '../constants';
 
@@ -25,7 +26,9 @@ function Section({ title, children }) {
   return (
     <View style={styles.section}>
       {title ? <Text style={styles.sectionTitle}>{title}</Text> : null}
-      <View style={styles.sectionBody}>{children}</View>
+      <GlassCard padded={false}>
+        {children}
+      </GlassCard>
     </View>
   );
 }
