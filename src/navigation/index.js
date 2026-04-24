@@ -26,6 +26,11 @@ import LiveScreen from '../screens/LiveScreen';
 import PostVideoScreen from '../screens/PostVideoScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import HashtagScreen from '../screens/HashtagScreen';
+import SavedScreen from '../screens/SavedScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
+import AnalyticsScreen from '../screens/AnalyticsScreen';
+import MonetizacaoScreen from '../screens/MonetizacaoScreen';
+import SettingsScreen from '../screens/SettingsScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -202,6 +207,11 @@ export default function Navigation() {
                        <Stack.Screen name="PostVideo" component={PostVideoScreen} />
                        <Stack.Screen name="EditProfile" component={EditProfileScreen} />
                        <Stack.Screen name="Hashtag" component={HashtagScreen} />
+                       <Stack.Screen name="Saved" component={SavedScreen} />
+                       <Stack.Screen name="Notifications" component={NotificationsScreen} />
+                       <Stack.Screen name="Analytics" component={AnalyticsScreen} />
+                       <Stack.Screen name="Monetizacao" component={MonetizacaoScreen} />
+                       <Stack.Screen name="Settings" component={SettingsScreen} />
            </>
          )}
 </Stack.Navigator>

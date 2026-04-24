@@ -72,6 +72,25 @@ export const blueAPI = {
           const token = await getToken();
           return api(`blue-profile?action=my-videos&token=${encodeURIComponent(token)}`);
     },
+    // Notificacoes do usuario logado (badge + lista). Retorna { notifications, unread }.
+    notificacoes: async () => {
+          const token = await getToken();
+          return api(`blue-profile?action=notifications&token=${encodeURIComponent(token)}`);
+    },
+    marcarNotificacoesLidas: async () => {
+          const token = await getToken();
+          return api('blue-profile', { method: 'POST', body: JSON.stringify({ action: 'mark-notifications-read', token }) });
+    },
+    // Analytics do criador (visoes/curtidas/saves agregados + lista videos).
+    analytics: async () => {
+          const token = await getToken();
+          return api(`blue-profile?action=analytics&token=${encodeURIComponent(token)}`);
+    },
+    // Videos salvos pelo usuario logado.
+    meusSalvos: async () => {
+          const token = await getToken();
+          return api('blue-interact', { method: 'POST', body: JSON.stringify({ action: 'meus-salvos', token }) });
+    },
     videosDoUsuario: async (user_id) => {
           return api(`blue-profile?action=user-videos&user_id=${encodeURIComponent(user_id)}`);
     },
