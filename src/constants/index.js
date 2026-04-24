@@ -1,5 +1,8 @@
 import Constants from 'expo-constants';
 
+// COLORS legado — mantido pra retrocompat com componentes antigos.
+// Novos componentes devem usar `import { colors, space, radius, blur } from './theme'`.
+// Veja src/constants/theme.js (Lote 8 — Liquid Glass design system).
 export const COLORS = {
   background: '#020817',
   surface: '#0a1628',
@@ -15,6 +18,9 @@ export const COLORS = {
   gold: '#FFD700',
   red: '#ef4444',
 };
+
+// Re-export do theme novo pra conveniencia (import unico):
+export * from './theme';
 
 export const API_BASE = Constants.expoConfig?.extra?.apiBaseUrl || 'https://bluetubeviral.com/api';
 export const SUPABASE_URL = Constants.expoConfig?.extra?.supabaseUrl || 'https://pokpfvjrccviwgguwuck.supabase.co';
