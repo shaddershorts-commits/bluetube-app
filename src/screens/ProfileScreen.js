@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator,
-  RefreshControl, Alert, Image, Modal, Pressable, Linking, useWindowDimensions,
+  RefreshControl, Alert, Image, Modal, Pressable, Linking, Share, useWindowDimensions,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -76,6 +76,22 @@ export default function ProfileScreen() {
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Sair', style: 'destructive', onPress: logout },
     ]);
+  };
+
+  const handleSharePerfil = async () => {
+    setMenuOpen(false);
+    const username = profile?.username || '';
+    if (!username) return Alert.alert('Erro', 'Username nao disponivel');
+    const url = `https://bluetubeviral.com/blue?u=${username}`;
+    try {
+      await Share.share({
+        message: `Confere meu perfil no BlueTube: ${url}`,
+        url, // iOS-only attachment
+        title: `@${username} no BlueTube`,
+      });
+    } catch (e) {
+      // Usuario cancelou ou erro do OS — silencioso
+    }
   };
 
   const sortedVideos = useMemo(() => sortVideos(videos, sortMode), [videos, sortMode]);
@@ -181,20 +197,20 @@ export default function ProfileScreen() {
           <Pressable style={[styles.menuSheet, { paddingBottom: insets.bottom + 12 }]}>
             <View style={styles.menuHandle} />
             <MenuItem icon="person-outline" label="Editar perfil" onPress={() => { setMenuOpen(false); nav.navigate('EditProfile'); }} />
-            <MenuItem icon="bookmark-outline" label="Salvos" onPress={() => { setMenuOpen(false); Alert.alert('Em breve', 'Lista de salvos em construção'); }} />
-            <MenuItem icon="notifications-outline" label="Notificações" onPress={() => { setMenuOpen(false); nav.navigate('Chat'); }} />
+            <MenuItem icon="bookmark-outline" label="Salvos" onPress={() => { setMenuOpen(false); nav.navigate('Saved'); }} />
+            <MenuItem icon="notifications-outline" label="Notificações" onPress={() => { setMenuOpen(false); nav.navigate('Notifications'); }} />
             <MenuItem
               icon="analytics-outline"
               label="Analytics"
-              onPress={() => { setMenuOpen(false); Alert.alert('Em breve', 'Analytics completo disponível em bluetubeviral.com/blue-analytics'); }}
+              onPress={() => { setMenuOpen(false); nav.navigate('Analytics'); }}
             />
             <MenuItem
               icon="cash-outline"
               label={stats?.tem_conta ? `Monetização — R$${(stats.saldo_disponivel || 0).toFixed(2)}` : 'Monetização'}
-              onPress={() => { setMenuOpen(false); Alert.alert('Em breve', 'Saques via app em construção — use o site por enquanto'); }}
+              onPress={() => { setMenuOpen(false); nav.navigate('Monetizacao'); }}
             />
-            <MenuItem icon="settings-outline" label="Configurações" onPress={() => { setMenuOpen(false); Alert.alert('Em breve', 'Configurações em construção'); }} />
-            <MenuItem icon="share-social-outline" label="Compartilhar perfil" onPress={() => { setMenuOpen(false); Alert.alert('Link copiado', `https://bluetubeviral.com/blue?u=${profile?.username || ''}`); }} />
+            <MenuItem icon="settings-outline" label="Configurações" onPress={() => { setMenuOpen(false); nav.navigate('Settings'); }} />
+            <MenuItem icon="share-social-outline" label="Compartilhar perfil" onPress={handleSharePerfil} />
             <View style={styles.menuDivider} />
             <MenuItem icon="log-out-outline" label="Sair" onPress={handleLogout} color={COLORS.red} />
           </Pressable>
