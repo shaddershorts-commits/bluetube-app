@@ -1,11 +1,38 @@
 import * as SecureStore from 'expo-secure-store';
 import * as FileSystem from 'expo-file-system';
 import * as VideoThumbnails from 'expo-video-thumbnails';
-import { API_BASE } from '../constants';
+import { API_BASE, SUPABASE_URL, SUPABASE_ANON_KEY } from '../constants';
 import { addBreadcrumb, captureError } from '../utils/sentry';
 
 async function getToken() {
     return await SecureStore.getItemAsync('bt_token');
+}
+
+// Fix 1 PII (auditoria 2026-04-24): refresh-token auto-login.
+// Substitui o pre-preenchimento de senha (bt_last_password) por troca
+// silenciosa de refresh_token por novo access_token. Chama Supabase Auth
+// REST direto — nao depende de api/auth.js (intocavel).
+// Retorna { access_token, refresh_token, user } ou null.
+export async function refreshSession(refreshToken) {
+    if (!refreshToken) return null;
+    try {
+        const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+            method: 'POST',
+            headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ refresh_token: refreshToken }),
+        });
+        if (!r.ok) return null;
+        const d = await r.json();
+        if (!d?.access_token) return null;
+        return { access_token: d.access_token, refresh_token: d.refresh_token, user: d.user };
+    } catch (e) {
+        // network error / timeout / DNS — retorna null silencioso
+        return null;
+    }
 }
 
 async function api(endpoint, options = {}) {

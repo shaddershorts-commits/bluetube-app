@@ -11,7 +11,10 @@ import blueAPI from '../api';
 import LogoBlueTube from '../components/LogoBlueTube';
 
 const EMAIL_KEY = 'bt_last_email';
-const PASSWORD_KEY = 'bt_last_password';
+// (Fix 1 PII auditoria 2026-04-24): bt_last_password REMOVIDO. Antes era salvo
+// pra pre-preencher senha — risco de vazamento se Keystore for dumped. Agora
+// app usa refresh-token auto-login (useAuthStore.init valida/renova token
+// silenciosamente, sem precisar de senha). User so digita senha 1x.
 
 export default function LoginScreen({ navigation, route }) {
   const [mode, setMode] = useState(route?.params?.mode === 'signup' ? 'signup' : 'signin');
@@ -25,13 +28,9 @@ export default function LoginScreen({ navigation, route }) {
   const { setToken, setUser } = useAuthStore();
 
   useEffect(() => {
+    // Pre-fill apenas o email (UX). Senha NAO eh persistida (Fix 1 PII).
     SecureStore.getItemAsync(EMAIL_KEY).then((e) => { if (e) setEmail(e); }).catch(() => {});
-    // Restaura senha salva (so faz sentido em modo signin — em signup nao
-    // pre-preenche senha de outro signup por seguranca)
-    if (mode === 'signin') {
-      SecureStore.getItemAsync(PASSWORD_KEY).then((p) => { if (p) setPassword(p); }).catch(() => {});
-    }
-  }, [mode]);
+  }, []);
 
   const handleSubmit = async () => {
     if (!email || !password) { setError('Preencha email e senha'); return; }
@@ -79,9 +78,8 @@ export default function LoginScreen({ navigation, route }) {
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       await SecureStore.setItemAsync(EMAIL_KEY, email).catch(() => {});
-      // Salva senha no SecureStore (criptografado pelo Keychain/Keystore do device)
-      // pra pre-preenchimento no proximo login. UX padrao em apps mobile.
-      await SecureStore.setItemAsync(PASSWORD_KEY, password).catch(() => {});
+      // Senha NAO eh mais salva (Fix 1 PII). Auto-login no proximo open
+      // acontece via refresh-token em useAuthStore.init.
       if (refresh) await SecureStore.setItemAsync('bt_refresh_token', refresh).catch(() => {});
       // setToken persiste em SecureStore internamente (bt_token)
       await setToken(token);
