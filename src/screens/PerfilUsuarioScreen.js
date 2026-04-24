@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, ActivityIndicator, ScrollView, TouchableOpacity,
   Image, useWindowDimensions, Alert,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import Header from '../components/Header';
 import Avatar from '../components/Avatar';
@@ -18,6 +19,7 @@ function formatCount(n) {
 export default function PerfilUsuarioScreen({ route }) {
   // Deep link /blue/@:username passa { username }; navegacao interna passa { user_id }
   const { user_id: paramUserId, username: paramUsername } = route.params || {};
+  const nav = useNavigation();
   const { width: W } = useWindowDimensions();
   const [profile, setProfile] = useState(null);
   const [videos, setVideos] = useState([]);
@@ -121,19 +123,28 @@ export default function PerfilUsuarioScreen({ route }) {
 
           {profile.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
 
-          <TouchableOpacity
-            style={[styles.followBtn, isFollowing && styles.followingBtn, followBusy && styles.busyBtn]}
-            onPress={toggleFollow}
-            disabled={followBusy}
-            activeOpacity={0.85}>
-            {followBusy ? (
-              <ActivityIndicator color={isFollowing ? COLORS.text : '#fff'} size="small" />
-            ) : (
-              <Text style={[styles.followText, isFollowing && styles.followingText]}>
-                {isFollowing ? '✓ Seguindo' : '+ Seguir'}
-              </Text>
-            )}
-          </TouchableOpacity>
+          <View style={styles.actionsRow}>
+            <TouchableOpacity
+              style={[styles.followBtn, isFollowing && styles.followingBtn, followBusy && styles.busyBtn]}
+              onPress={toggleFollow}
+              disabled={followBusy}
+              activeOpacity={0.85}>
+              {followBusy ? (
+                <ActivityIndicator color={isFollowing ? COLORS.text : '#fff'} size="small" />
+              ) : (
+                <Text style={[styles.followText, isFollowing && styles.followingText]}>
+                  {isFollowing ? '✓ Seguindo' : '+ Seguir'}
+                </Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.msgBtn}
+              onPress={() => nav.navigate('Conversa', { initNewChat: true, other: profile })}
+              activeOpacity={0.85}>
+              <Ionicons name="chatbubble-outline" size={18} color={COLORS.text} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={[styles.grid, { padding: GAP, gap: GAP }]}>
@@ -184,14 +195,21 @@ const styles = StyleSheet.create({
   stat: { alignItems: 'center' },
   statValue: { color: COLORS.text, fontSize: 16, fontWeight: '800' },
   statLabel: { color: COLORS.textSecondary, fontSize: 11, marginTop: 2 },
+  actionsRow: { flexDirection: 'row', gap: 10, marginTop: 18, alignItems: 'center' },
   followBtn: {
     backgroundColor: COLORS.primary,
     paddingHorizontal: 34,
     paddingVertical: 10,
     borderRadius: 10,
-    marginTop: 18,
     minWidth: 160,
     alignItems: 'center',
+  },
+  msgBtn: {
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    width: 44, height: 44, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center',
   },
   followingBtn: {
     backgroundColor: 'rgba(255,255,255,0.04)',

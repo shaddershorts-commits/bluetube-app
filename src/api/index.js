@@ -117,12 +117,23 @@ export const blueAPI = {
           return api(`blue-chat?action=conversations&token=${encodeURIComponent(token)}`);
     },
     mensagens: async (conversation_id) => {
+          // Backend espera `conv_id` (nao `conversation_id`) — alinhado com web.
           const token = await getToken();
-          return api(`blue-chat?action=messages&conversation_id=${conversation_id}&token=${encodeURIComponent(token)}`);
+          return api(`blue-chat?action=messages&conv_id=${conversation_id}&token=${encodeURIComponent(token)}`);
     },
     enviarMensagem: async (conversation_id, content, receiver_id) => {
+          // Backend espera `to_user_id` + `text` (nao `receiver_id` + `content`).
+          // O `conversation_id` nao eh enviado — backend deriva do par sorted.
           const token = await getToken();
-          return api('blue-chat', { method: 'POST', body: JSON.stringify({ action: 'send', conversation_id, content, receiver_id, token }) });
+          return api('blue-chat', { method: 'POST', body: JSON.stringify({ action: 'send', to_user_id: receiver_id, text: content, token }) });
+    },
+    abrirConversa: async (with_user_id) => {
+          // Cria-ou-pega conversa com outro user; retorna { conv_id, other }.
+          // Usado pelo botao "Enviar mensagem" no PerfilUsuarioScreen pra abrir
+          // ConversaScreen com conv_id real (sem isso, ConversaScreen nao tem
+          // conv_id e qualquer GET messages falha).
+          const token = await getToken();
+          return api('blue-chat', { method: 'POST', body: JSON.stringify({ action: 'open-conv', with_user_id, token }) });
     },
 
     // Stories
