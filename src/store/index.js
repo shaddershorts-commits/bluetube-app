@@ -40,11 +40,15 @@ export const useFeedStore = create((set) => ({
   hasMore: true,
   isLoading: false,
   currentIndex: 0,
+  // Lote 7 — feed infinito: rastreia modo do backend (fresh|seen_recycle)
+  // pra disparar banner sutil na transicao.
+  feedMode: 'fresh',
   setVideos: (videos) => set({ videos }),
   addVideos: (videos) => set((s) => ({ videos: [...s.videos, ...videos] })),
   setCursor: (cursor) => set({ cursor }),
   setHasMore: (hasMore) => set({ hasMore }),
   setLoading: (isLoading) => set({ isLoading }),
   setCurrentIndex: (i) => set({ currentIndex: i }),
-  reset: () => set({ videos: [], cursor: null, hasMore: true, currentIndex: 0 }),
+  setFeedMode: (m) => set({ feedMode: m }),
+  reset: () => set({ videos: [], cursor: null, hasMore: true, currentIndex: 0, feedMode: 'fresh' }),
 }));

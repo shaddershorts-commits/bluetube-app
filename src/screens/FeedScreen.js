@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Animated, useWindowDimensions } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
@@ -13,7 +13,7 @@ import { COLORS } from '../constants';
 let _popupShownThisSession = false;
 
 export default function FeedScreen() {
-  const { videos, addVideos, setVideos, cursor, setCursor, hasMore, setHasMore, isLoading, setLoading, setCurrentIndex } = useFeedStore();
+  const { videos, addVideos, setVideos, cursor, setCursor, hasMore, setHasMore, isLoading, setLoading, setCurrentIndex, feedMode, setFeedMode } = useFeedStore();
   const user = useAuthStore((s) => s.user);
   const listRef = useRef(null);
   const insets = useSafeAreaInsets();
@@ -24,6 +24,24 @@ export default function FeedScreen() {
   // Sem isso, snapToInterval usa H-60 e desalinha em devices com gesture bar/notch.
   const CARD_H = Math.max(1, Math.round(winH - tabH));
   const [showPopup, setShowPopup] = useState(false);
+  // Lote 7 — banner sutil quando feed transiciona pra seen_recycle
+  const [bannerText, setBannerText] = useState(null);
+  const bannerOpacity = useRef(new Animated.Value(0)).current;
+  const emptyRoundsRef = useRef(0);
+  const bannerTimerRef = useRef(null);
+
+  const showBanner = useCallback((text) => {
+    setBannerText(text);
+    if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
+    Animated.timing(bannerOpacity, { toValue: 1, duration: 280, useNativeDriver: true }).start();
+    bannerTimerRef.current = setTimeout(() => {
+      Animated.timing(bannerOpacity, { toValue: 0, duration: 280, useNativeDriver: true }).start(() => {
+        setBannerText(null);
+      });
+    }, 3000);
+  }, [bannerOpacity]);
+
+  useEffect(() => () => { if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current); }, []);
 
   useEffect(() => {
     if (!_popupShownThisSession) {
@@ -47,16 +65,32 @@ export default function FeedScreen() {
       );
       if (reset) {
         setVideos(incoming);
+        emptyRoundsRef.current = 0;
       } else {
         const seen = new Set(videos.map((v) => v.id));
         const deduped = incoming.filter((v) => !seen.has(v.id));
-        if (deduped.length) addVideos(deduped);
-        // Se nao veio nada novo E hasMore ainda tava true, marca false defensivamente
-        // (evita loop infinito do onEndReached chamando loadFeed que nao adiciona nada)
-        if (!deduped.length && hasMore) setHasMore(false);
+        if (deduped.length) {
+          addVideos(deduped);
+          emptyRoundsRef.current = 0;
+        } else {
+          // Lote 7 — em seen_recycle eh natural vir duplicatas as vezes.
+          // Conta rounds vazios consecutivos pra prevenir loop sem matar feed:
+          // 3 vazios seguidos = para temporariamente (ate user fazer reset).
+          emptyRoundsRef.current = (emptyRoundsRef.current || 0) + 1;
+          if (emptyRoundsRef.current >= 3) {
+            console.warn('[FeedScreen] 3 rounds sem videos novos — pausando loadMore');
+            setHasMore(false);
+          }
+        }
       }
       setCursor(d.next_cursor);
       setHasMore(!!d.has_more);
+      // Lote 7 — detecta transicao fresh → seen_recycle e dispara banner
+      const newMode = d.feed_mode || 'fresh';
+      if (newMode !== feedMode) {
+        setFeedMode(newMode);
+        if (newMode === 'seen_recycle' && !reset) showBanner('🔄 Reprises dos virais');
+      }
     } catch (e) {
       // NAO silenciar (regra do user). Log no console + Sentry.
       console.error('[FeedScreen] loadFeed falhou:', e?.message || e, {
@@ -128,6 +162,13 @@ export default function FeedScreen() {
       <View style={[styles.livesOverlay, { top: insets.top }]} pointerEvents="box-none">
         <LivesBar />
       </View>
+      {bannerText ? (
+        <Animated.View
+          style={[styles.feedModeBanner, { top: insets.top + 56, opacity: bannerOpacity }]}
+          pointerEvents="none">
+          <Text style={styles.feedModeBannerText}>{bannerText}</Text>
+        </Animated.View>
+      ) : null}
       <PopupBoasVindas
         visible={showPopup}
         username={user?.user_metadata?.username || user?.email?.split('@')[0]}
@@ -143,4 +184,20 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.background, gap: 12 },
   emptyIcon: { fontSize: 48 },
   emptyText: { color: COLORS.textSecondary, fontSize: 14 },
+  feedModeBanner: {
+    position: 'absolute',
+    alignSelf: 'center',
+    backgroundColor: 'rgba(2,8,23,0.88)',
+    borderWidth: 1,
+    borderColor: 'rgba(0,170,255,0.35)',
+    borderRadius: 100,
+    paddingVertical: 9,
+    paddingHorizontal: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
+  },
+  feedModeBannerText: { color: '#fff', fontSize: 13, fontWeight: '600', letterSpacing: 0.2 },
 });
