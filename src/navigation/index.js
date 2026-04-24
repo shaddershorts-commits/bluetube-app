@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Linking as RNLinking } from 'react-native';
+import { Linking as RNLinking, Image, View } from 'react-native';
 import * as Linking from 'expo-linking';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -90,6 +90,38 @@ const linking = {
     },
 };
 
+// Icone da aba Perfil: usa avatar do user logado se disponivel, senao ionicon.
+// Carrega 1x na montagem do tab bar (cache em memoria) — nao re-fetcha a cada
+// re-render. Re-monta quando token muda (logout/login).
+function PerfilTabIcon({ color, focused }) {
+  const token = useAuthStore((s) => s.token);
+  const [avatarUrl, setAvatarUrl] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    if (!token) { setAvatarUrl(null); return; }
+    blueAPI.meuPerfil()
+      .then((d) => { if (!cancelled && d?.profile?.avatar_url) setAvatarUrl(d.profile.avatar_url); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [token]);
+  if (avatarUrl) {
+    return (
+      <View style={{
+        width: 30, height: 30, borderRadius: 15, padding: 0,
+        borderWidth: focused ? 2 : 1.5,
+        borderColor: focused ? COLORS.neon : 'rgba(255,255,255,0.25)',
+        overflow: 'hidden',
+      }}>
+        <Image
+          source={{ uri: avatarUrl }}
+          style={{ width: '100%', height: '100%', borderRadius: 15 }}
+        />
+      </View>
+    );
+  }
+  return <Ionicons name={focused ? 'person' : 'person-outline'} color={color} size={24} />;
+}
+
 function MainTabs() {
     return (
           <Tab.Navigator
@@ -104,7 +136,8 @@ function MainTabs() {
                   tabBarInactiveTintColor: COLORS.textDim,
                   tabBarLabelStyle: { fontSize: 10 },
                   tabBarIcon: ({ color, focused }) => {
-                              const icons = { Feed: 'home', Descobrir: 'search', Camera: 'add-circle', Chat: 'chatbubble', Perfil: 'person' };
+                              if (route.name === 'Perfil') return <PerfilTabIcon color={color} focused={focused} />;
+                              const icons = { Feed: 'home', Descobrir: 'search', Camera: 'add-circle', Chat: 'chatbubble' };
                               const name = icons[route.name] + (focused ? '' : '-outline');
                               return <Ionicons name={name} color={color} size={route.name === 'Camera' ? 38 : 24} />;
 },
