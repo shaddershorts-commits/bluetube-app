@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing, Modal, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { COLORS } from '../constants';
+import { colors as theme, blur as blurT, radius } from '../constants/theme';
 import blueAPI from '../api';
 
 export default function PopupBoasVindas({ visible, username, onClose }) {
@@ -38,11 +40,14 @@ export default function PopupBoasVindas({ visible, username, onClose }) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose}>
+        {/* Backdrop com blur escuro (Liquid Glass) */}
+        <BlurView intensity={blurT.heavy} tint="dark" style={StyleSheet.absoluteFill} />
         <Animated.View
           style={[styles.card, { opacity: cardOpacity, transform: [{ translateY: cardY }] }]}
           onStartShouldSetResponder={() => true}
         >
-          <LinearGradient colors={['rgba(26,107,255,0.18)', 'rgba(0,170,255,0.08)']} style={styles.gradient}>
+          <BlurView intensity={blurT.medium} tint="dark" style={StyleSheet.absoluteFill} />
+          <LinearGradient colors={['rgba(26,107,255,0.22)', 'rgba(0,170,255,0.08)']} style={styles.gradient}>
             <Animated.Text style={[styles.emoji, { transform: [{ scale: emojiScale }] }]}>🚀</Animated.Text>
             <Text style={styles.title}>{username ? `Bem-vindo, @${username}!` : 'Bem-vindo ao Blue!'}</Text>
             <Text style={styles.line}>{line}</Text>
@@ -62,12 +67,12 @@ export default function PopupBoasVindas({ visible, username, onClose }) {
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  overlay: { flex: 1, backgroundColor: 'rgba(2,8,23,0.6)', alignItems: 'center', justifyContent: 'center', padding: 24 },
   card: {
-    width: '100%', maxWidth: 360, borderRadius: 20, overflow: 'hidden',
-    borderWidth: 1, borderColor: 'rgba(0,170,255,0.25)',
+    width: '100%', maxWidth: 360, borderRadius: radius.xl, overflow: 'hidden',
+    borderWidth: 1, borderColor: theme.borderGlass,
   },
-  gradient: { padding: 28, backgroundColor: 'rgba(10,22,40,0.95)', alignItems: 'center' },
+  gradient: { padding: 28, alignItems: 'center' },
   emoji: { fontSize: 72, marginBottom: 14 },
   title: { color: COLORS.text, fontSize: 20, fontWeight: '800', textAlign: 'center', marginBottom: 8 },
   line: { color: COLORS.textSecondary, fontSize: 14, textAlign: 'center', marginBottom: 22, lineHeight: 20 },

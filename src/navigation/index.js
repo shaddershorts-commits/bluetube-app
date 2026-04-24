@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Linking as RNLinking, Image, View } from 'react-native';
+import { Linking as RNLinking, Image, View, StyleSheet } from 'react-native';
 import * as Linking from 'expo-linking';
+import { BlurView } from 'expo-blur';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../store';
 import { COLORS } from '../constants';
+import { colors as theme, blur as blurT } from '../constants/theme';
 import blueAPI from '../api';
 import SplashScreen from '../screens/SplashScreen';
 import IntroScreen from '../screens/IntroScreen';
@@ -132,11 +134,23 @@ function MainTabs() {
           <Tab.Navigator
         screenOptions={({ route }) => ({
                   headerShown: false,
+                  // Liquid Glass — Lote 8: tab bar com BlurView no fundo
                   tabBarStyle: {
-                              backgroundColor: COLORS.background,
-                              borderTopColor: COLORS.border,
-                              height: 60, paddingBottom: 6, paddingTop: 6,
+                              position: 'absolute',
+                              backgroundColor: 'transparent',
+                              borderTopColor: theme.borderGlass,
+                              borderTopWidth: StyleSheet.hairlineWidth,
+                              height: 64,
+                              paddingBottom: 8,
+                              paddingTop: 8,
+                              elevation: 0, // Android: remove shadow padrao (BlurView ja eh visual)
                   },
+                  tabBarBackground: () => (
+                              <View style={StyleSheet.absoluteFill}>
+                                <BlurView intensity={blurT.heavy} tint="dark" style={StyleSheet.absoluteFill} />
+                                <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.glassDark }]} />
+                              </View>
+                  ),
                   tabBarActiveTintColor: COLORS.neon,
                   tabBarInactiveTintColor: COLORS.textDim,
                   tabBarLabelStyle: { fontSize: 10 },

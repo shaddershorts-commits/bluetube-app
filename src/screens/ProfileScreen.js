@@ -5,11 +5,13 @@ import {
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import Avatar from '../components/Avatar';
 import blueAPI from '../api';
 import { useAuthStore } from '../store';
 import { COLORS } from '../constants';
+import { colors as theme, blur as blurT, radius } from '../constants/theme';
 
 const SORT_MODES = [
   { key: 'recent', label: 'Recentes' },
@@ -191,10 +193,13 @@ export default function ProfileScreen() {
         </View>
       </ScrollView>
 
-      {/* Menu hamburger (bottom sheet) */}
+      {/* Menu hamburger (bottom sheet) — Liquid Glass */}
       <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
         <Pressable style={styles.menuBackdrop} onPress={() => setMenuOpen(false)}>
+          <BlurView intensity={blurT.heavy} tint="dark" style={StyleSheet.absoluteFill} />
           <Pressable style={[styles.menuSheet, { paddingBottom: insets.bottom + 12 }]}>
+            <BlurView intensity={blurT.medium} tint="dark" style={StyleSheet.absoluteFill} />
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.glassDark }]} pointerEvents="none" />
             <View style={styles.menuHandle} />
             <MenuItem icon="person-outline" label="Editar perfil" onPress={() => { setMenuOpen(false); nav.navigate('EditProfile'); }} />
             <MenuItem icon="bookmark-outline" label="Salvos" onPress={() => { setMenuOpen(false); nav.navigate('Saved'); }} />
@@ -338,15 +343,20 @@ const styles = StyleSheet.create({
   emptyHint: { color: COLORS.textDim, fontSize: 12, marginTop: 6 },
 
   menuBackdrop: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.55)',
+    flex: 1, backgroundColor: 'rgba(2,8,23,0.45)', // semi-transparente, BlurView faz o resto
     justifyContent: 'flex-end',
   },
   menuSheet: {
-    backgroundColor: '#0a0f1a',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    backgroundColor: 'transparent', // BlurView + glassDark tint cobrem
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     paddingTop: 8,
     paddingHorizontal: 14,
+    overflow: 'hidden', // critico pra BlurView respeitar borderRadius
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
   },
   menuHandle: {
     width: 42, height: 4, borderRadius: 2,
