@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { scrubEvent } from './scrub';
 
 // Expo Go não carrega módulos nativos do Sentry. Detecta e vira no-op.
 const isExpoGo = Constants.executionEnvironment === 'storeClient';
@@ -35,9 +36,13 @@ export function initSentry() {
     enableAutoSessionTracking: true,
     sessionTrackingIntervalMillis: 30000,
     attachStacktrace: true,
+    // Fix 2 PII (auditoria 2026-04-24): scrub de email/JWT/CPF/Bearer/etc
+    // antes de enviar pro Sentry. Tambem limpa chaves sensiveis pelo nome
+    // (password, token, cpf, etc). Ver src/utils/scrub.js.
     beforeSend(event) {
       if (__DEV__) return null;
-      return event;
+      try { return scrubEvent(event); }
+      catch (e) { return event; } // fail-open: se scrub crashar, prefere enviar do que perder evento
     },
   });
   _initialized = true;
@@ -45,10 +50,11 @@ export function initSentry() {
 
 export function setUserContext(user) {
   if (!_initialized || !user) return;
+  // Fix 2 PII (auditoria 2026-04-24): SO id (UUID anonymized).
+  // Email/username removidos — eram PII enviada explicitamente pro Sentry.
+  // ID sozinho permite correlacao de erros no dashboard sem expor identidade.
   Sentry.setUser({
     id: user.id,
-    username: user.user_metadata?.username || user.email?.split('@')[0],
-    email: user.email,
   });
 }
 
