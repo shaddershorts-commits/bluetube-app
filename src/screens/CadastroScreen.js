@@ -32,6 +32,7 @@ export default function CadastroScreen({ navigation }) {
   const [password, setPassword] = useState('');
   const [confirmPwd, setConfirmPwd] = useState('');
   const [termos, setTermos] = useState(false);
+  const [idade16, setIdade16] = useState(false); // Fix 6 (Gap 5): age check 16+
   const [showPwd, setShowPwd] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -59,6 +60,10 @@ export default function CadastroScreen({ navigation }) {
     }
     if (password !== confirmPwd) {
       setError('As senhas nao coincidem');
+      return;
+    }
+    if (!idade16) {
+      setError('Voce precisa ter 16 anos ou mais para criar conta');
       return;
     }
     if (!termos) {
@@ -192,6 +197,19 @@ export default function CadastroScreen({ navigation }) {
               {password === confirmPwd ? '✓ Senhas coincidem' : '✗ Senhas diferentes'}
             </Text>
           )}
+
+          {/* Idade 16+ (Fix 6 - Gap 5) */}
+          <TouchableOpacity
+            style={styles.termosRow}
+            onPress={() => setIdade16(t => !t)}
+            activeOpacity={0.7}>
+            <View style={[styles.checkbox, idade16 && styles.checkboxOn]}>
+              {idade16 && <Ionicons name="checkmark" size={14} color="#fff" />}
+            </View>
+            <Text style={styles.termosText}>
+              Tenho 16 anos ou mais
+            </Text>
+          </TouchableOpacity>
 
           {/* Termos */}
           <TouchableOpacity

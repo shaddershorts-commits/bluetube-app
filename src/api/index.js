@@ -60,6 +60,10 @@ export const blueAPI = {
     // Auth
     signin: (email, password) => api('auth', { method: 'POST', body: JSON.stringify({ action: 'signin', email, password }) }),
     signup: (email, password) => api('auth', { method: 'POST', body: JSON.stringify({ action: 'signup', email, password }) }),
+    // DEAD CODE: blueAPI.refresh nunca e chamado. Refresh real e via refreshSession()
+    // standalone (Fix 1, ec680c3) que vai direto pra Supabase Auth REST. Mantido por
+    // compat. Se for chamar refresh, use refreshSession(). auth.js NAO tem action='refresh'.
+    // TODO: remover quando confirmado que ninguem depende.
     refresh: (refresh_token) => api('auth', { method: 'POST', body: JSON.stringify({ action: 'refresh', refresh_token }) }),
 
     // Feed

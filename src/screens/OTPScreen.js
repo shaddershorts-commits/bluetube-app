@@ -16,6 +16,31 @@ import blueAPI from '../api';
 const OTP_LEN = 6;
 const RESEND_SECS = 59;
 
+// Fix 6 (Gap 5): confirm-age com retry exponencial (1s, 3s, 8s).
+// Caminho D fail-soft: NAO bloqueia signup se persistencia falhar.
+// 4xx legitimo nao retry. Apenas 5xx/network retry.
+async function confirmAgeWithRetry(token) {
+  const delays = [1000, 3000, 8000];
+  for (let i = 0; i < 3; i++) {
+    try {
+      const r = await fetch(`${API_BASE}/v1/confirm-age`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      });
+      if (r.ok) return { ok: true };
+      if (r.status >= 400 && r.status < 500) {
+        // 4xx (token invalido/etc): nao retry, fail definitivo
+        return { ok: false, error: `4xx_${r.status}` };
+      }
+      // 5xx: retry
+    } catch (e) {
+      // network error: retry
+    }
+    if (i < 2) await new Promise(r => setTimeout(r, delays[i]));
+  }
+  return { ok: false, error: 'all_retries_failed' };
+}
+
 export default function OTPScreen({ navigation, route }) {
   const { email, fromCadastro } = route?.params || {};
   const [digits, setDigits] = useState(Array(OTP_LEN).fill(''));
@@ -100,6 +125,14 @@ export default function OTPScreen({ navigation, route }) {
         const token = d.session?.access_token || d.access_token;
         const refresh = d.session?.refresh_token;
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+
+        // Fix 6 (Gap 5) - Caminho D fail-soft: confirm-age com 3 retries (1s, 3s, 8s).
+        // Se TODOS falharem, NAO bloqueia login. Login efetivo prossegue normal.
+        // confirm-age e idempotente — proximo login regulariza automaticamente.
+        confirmAgeWithRetry(token).catch((e) => {
+          console.warn('[otp] confirm-age falhou apos retries — sera retry no proximo login:', e?.message);
+        });
+
         await setToken(token);
         if (refresh) await SecureStore.setItemAsync('bt_refresh_token', refresh);
         setUser(d.session?.user || d.user);
@@ -127,11 +160,12 @@ export default function OTPScreen({ navigation, route }) {
     setTimer(RESEND_SECS);
 
     try {
-      // TODO: confirmar se auth.js tem action 'resend-otp' ou 'forgot-password'
+      // auth.js linha 1692 aceita 'send_otp' (re-envia OTP gerando novo codigo).
+      // Bug original 'resend-otp' caia em fallback silencioso; "Reenviar" nao funcionava.
       const r = await fetch(`${API_BASE}/auth`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'resend-otp', email }),
+        body: JSON.stringify({ action: 'send_otp', email }),
       });
       const d = await r.json().catch(() => ({}));
       Alert.alert(

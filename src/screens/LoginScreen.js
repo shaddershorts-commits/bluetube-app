@@ -84,6 +84,14 @@ export default function LoginScreen({ navigation, route }) {
       // setToken persiste em SecureStore internamente (bt_token)
       await setToken(token);
       setUser(d.session?.user || d.user);
+
+      // Fix 6 (Gap 5): fire-and-forget confirm-age silencioso. Idempotente —
+      // se ja age_confirmed=TRUE, no-op. Se NULL/FALSE (signup falhou no
+      // confirm-age inicial), regulariza agora. Sem retry, sem bloqueio.
+      fetch(`${API_BASE}/v1/confirm-age`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      }).catch(() => {});
     } catch (e) {
       setError('Erro de conexão');
     }
@@ -93,10 +101,13 @@ export default function LoginScreen({ navigation, route }) {
   const handleForgot = async () => {
     if (!email) { setError('Digite seu email acima primeiro'); return; }
     try {
+      // auth.js linha 1812 aceita 'reset_password' (envia link de redefinicao por email).
+      // Bug original 'forgot-password' nao batia em nenhum handler; "Esqueci minha senha"
+      // sempre falhava silencioso.
       const r = await fetch(`${API_BASE}/auth`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'forgot-password', email }),
+        body: JSON.stringify({ action: 'reset_password', email }),
       });
       const d = await r.json().catch(() => ({}));
       if (r.ok) {
