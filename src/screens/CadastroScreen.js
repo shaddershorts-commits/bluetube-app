@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, ActivityIndicator, KeyboardAvoidingView,
-  Platform, Alert, Animated,
+  Platform, Alert, Animated, Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
@@ -221,9 +221,17 @@ export default function CadastroScreen({ navigation }) {
             </View>
             <Text style={styles.termosText}>
               Li e aceito os{' '}
-              <Text style={{ color: COLORS.accent }}>Termos de Uso</Text>
+              <Text
+                style={{ color: COLORS.accent }}
+                onPress={() => Linking.openURL('https://bluetubeviral.com/termos').catch(() => {})}>
+                Termos de Uso
+              </Text>
               {' '}e a{' '}
-              <Text style={{ color: COLORS.accent }}>Politica de Privacidade</Text>
+              <Text
+                style={{ color: COLORS.accent }}
+                onPress={() => Linking.openURL('https://bluetubeviral.com/privacidade').catch(() => {})}>
+                Politica de Privacidade
+              </Text>
             </Text>
           </TouchableOpacity>
 

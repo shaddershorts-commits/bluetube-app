@@ -70,6 +70,9 @@ export default {
                   supabaseKey: process.env.SUPABASE_ANON_KEY || '',
                   apiBaseUrl: process.env.API_BASE_URL || 'https://bluetubeviral.com/api',
                   sentryDsn: process.env.SENTRY_DSN || '',
+                  // URLs lidas pela Apple/Google ao submeter app pra loja
+                  privacyPolicyUrl: 'https://bluetubeviral.com/privacidade',
+                  termsOfServiceUrl: 'https://bluetubeviral.com/termos',
                   eas: { projectId: 'c7a657a7-92a2-42ba-9cab-77a54a62077f' },
           },
     },
