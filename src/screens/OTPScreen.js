@@ -87,12 +87,12 @@ export default function OTPScreen({ navigation, route }) {
     setLoading(true);
 
     try {
-      // TODO: confirmar se blue-onboarding.js ou auth.js tem action 'verify-otp'
-      // Assumindo NÃO existe — usando fallback com Alert
+      // auth.js aceita action 'verify_otp' (underscore) — nao 'verify-otp' (hifen).
+      // Bug original deixava signup app travado em produacao desde o inicio.
       const r = await fetch(`${API_BASE}/auth`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'verify-otp', email, token: code }),
+        body: JSON.stringify({ action: 'verify_otp', email, otp: code }),
       });
       const d = await r.json().catch(() => ({}));
 
