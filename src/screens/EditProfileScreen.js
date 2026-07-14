@@ -28,6 +28,8 @@ export default function EditProfileScreen() {
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
   const [bio, setBio] = useState('');
+  const [linkUrl, setLinkUrl] = useState('');
+  const [linkLabel, setLinkLabel] = useState('');
   const [avatarUri, setAvatarUri] = useState(null);   // URI local (novo avatar)
   const [avatarRemote, setAvatarRemote] = useState(null); // URL remota (perfil atual)
 
@@ -39,6 +41,8 @@ export default function EditProfileScreen() {
       setDisplayName(p.display_name || '');
       setUsername(p.username || '');
       setBio(p.bio || '');
+      setLinkUrl(p.link_url || '');
+      setLinkLabel(p.link_label || '');
       setAvatarRemote(p.avatar_url || null);
       setLoading(false);
     })();
@@ -77,6 +81,11 @@ export default function EditProfileScreen() {
     if (dn !== (original.display_name || '')) patch.display_name = dn;
     if (b !== (original.bio || '')) patch.bio = b;
     if (un && un !== (original.username || '')) patch.username = un;
+    // Link estilo Instagram (URL + nome de exibicao)
+    const lu = linkUrl.trim().slice(0, 200);
+    const ll = linkLabel.trim().slice(0, 40);
+    if (lu !== (original.link_url || '')) patch.link_url = lu;
+    if (ll !== (original.link_label || '')) patch.link_label = ll;
 
     // Avatar — converte local pra base64 só se mudou
     if (avatarUri) {
@@ -173,6 +182,26 @@ export default function EditProfileScreen() {
           placeholder="Uma linha sobre você"
           max={MAX_BIO}
           multiline
+          disabled={saving}
+        />
+
+        <Field
+          label="Link"
+          value={linkUrl}
+          onChange={(v) => setLinkUrl(v.slice(0, 200))}
+          placeholder="seusite.com ou instagram.com/voce"
+          max={200}
+          autoCapitalize="none"
+          disabled={saving}
+          helper="aparece como botão clicável no seu perfil"
+        />
+
+        <Field
+          label="Nome do link"
+          value={linkLabel}
+          onChange={(v) => setLinkLabel(v.slice(0, 40))}
+          placeholder="ex.: Meu Instagram"
+          max={40}
           disabled={saving}
         />
 

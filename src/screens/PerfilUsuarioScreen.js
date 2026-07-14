@@ -122,6 +122,16 @@ export default function PerfilUsuarioScreen({ route }) {
           </View>
 
           {profile.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
+          {profile.link_url ? (
+            <TouchableOpacity
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8, maxWidth: '85%' }}
+              onPress={() => { const { Linking } = require('react-native'); Linking.openURL(profile.link_url).catch(() => {}); }}>
+              <Ionicons name="link" size={14} color={COLORS.neon} />
+              <Text style={{ color: COLORS.neon, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>
+                {profile.link_label || profile.link_url.replace(/^https?:\/\//, '')}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
 
           <View style={styles.actionsRow}>
             <TouchableOpacity
@@ -159,7 +169,7 @@ export default function PerfilUsuarioScreen({ route }) {
                 key={v.id}
                 style={[styles.gridCard, { width: cardW, height: cardH }]}
                 activeOpacity={0.85}
-                onPress={() => nav.navigate('Video', { video: v, video_id: v.id })}>
+                onPress={() => nav.navigate('Video', { videos, startIndex: videos.indexOf(v), mode: 'user', creator: profile })}>
                 {v.thumbnail_url ? (
                   <Image source={{ uri: v.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
                 ) : (

@@ -120,6 +120,13 @@ export const useFeedStore = create((set) => ({
   // audio continua tocando com o app minimizado no Android.
   appActive: true,
   setAppActive: (appActive) => set({ appActive }),
+  // Mute GLOBAL do feed: silenciar um video vale pra todos os seguintes
+  muted: false,
+  setMuted: (muted) => set({ muted }),
+  // user_ids com story ativo (alimentado pela StoriesBar) — anel azul no
+  // avatar dentro do video + tap abre o story
+  storyUsers: new Set(),
+  setStoryUsers: (storyUsers) => set({ storyUsers }),
   setVideos: (videos) => set({ videos }),
   addVideos: (videos) => set((s) => ({ videos: [...s.videos, ...videos] })),
   setCursor: (cursor) => set({ cursor }),

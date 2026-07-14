@@ -16,6 +16,8 @@ export const LANGS = [
 
 const T = {
   pt: {
+    story_reply: "Responder…", story_none: "Nenhum story ativo", st_delete_story: "Excluir story", gallery: "Galeria", camera_perm: "Precisamos de acesso à câmera", allow: "Permitir", recording: "Gravando…", preview: "Preview", rec_ok: "Vídeo gravado com sucesso!", continue_btn: "Continuar →", rec_again: "Gravar novamente", edit_profile: "Editar perfil", saved: "Salvos", analytics: "Estatísticas", monetization: "Monetização", logout_menu: "Sair", share_profile: "Compartilhar perfil",
+
     feed_empty: 'Nenhum vídeo ainda.', feed_reprises: '🔄 Reprises dos virais',
     discover_title: 'Descobrir', discover_tags: 'Em alta', discover_empty: 'Nenhum vídeo ainda.', discover_videos: 'vídeos',
     video_title: 'Vídeo', video_notfound: 'Vídeo não encontrado',
@@ -32,6 +34,8 @@ const T = {
     st_open_support: 'Abrir suporte', st_pick_lang: 'Escolher idioma',
   },
   en: {
+    story_reply: "Reply…", story_none: "No active stories", st_delete_story: "Delete story", gallery: "Gallery", camera_perm: "We need camera access", allow: "Allow", recording: "Recording…", preview: "Preview", rec_ok: "Video recorded successfully!", continue_btn: "Continue →", rec_again: "Record again", edit_profile: "Edit profile", saved: "Saved", analytics: "Analytics", monetization: "Monetization", logout_menu: "Log out", share_profile: "Share profile",
+
     feed_empty: 'No videos yet.', feed_reprises: '🔄 Viral reruns',
     discover_title: 'Discover', discover_tags: 'Trending', discover_empty: 'No videos yet.', discover_videos: 'videos',
     video_title: 'Video', video_notfound: 'Video not found',
@@ -48,6 +52,8 @@ const T = {
     st_open_support: 'Open support', st_pick_lang: 'Choose language',
   },
   es: {
+    story_reply: "Responder…", story_none: "Sin stories activos", st_delete_story: "Eliminar story", gallery: "Galería", camera_perm: "Necesitamos acceso a la cámara", allow: "Permitir", recording: "Grabando…", preview: "Vista previa", rec_ok: "¡Video grabado con éxito!", continue_btn: "Continuar →", rec_again: "Grabar de nuevo", edit_profile: "Editar perfil", saved: "Guardados", analytics: "Estadísticas", monetization: "Monetización", logout_menu: "Salir", share_profile: "Compartir perfil",
+
     feed_empty: 'Aún no hay videos.', feed_reprises: '🔄 Reposiciones virales',
     discover_title: 'Descubrir', discover_tags: 'Tendencias', discover_empty: 'Aún no hay videos.', discover_videos: 'videos',
     video_title: 'Video', video_notfound: 'Video no encontrado',
@@ -64,6 +70,8 @@ const T = {
     st_open_support: 'Abrir soporte', st_pick_lang: 'Elegir idioma',
   },
   fr: {
+    story_reply: "Répondre…", story_none: "Aucune story active", st_delete_story: "Supprimer la story", gallery: "Galerie", camera_perm: "Accès caméra requis", allow: "Autoriser", recording: "Enregistrement…", preview: "Aperçu", rec_ok: "Vidéo enregistrée !", continue_btn: "Continuer →", rec_again: "Réenregistrer", edit_profile: "Modifier le profil", saved: "Enregistrés", analytics: "Statistiques", monetization: "Monétisation", logout_menu: "Déconnexion", share_profile: "Partager le profil",
+
     feed_empty: 'Aucune vidéo pour le moment.', feed_reprises: '🔄 Rediffusions virales',
     discover_title: 'Découvrir', discover_tags: 'Tendances', discover_empty: 'Aucune vidéo pour le moment.', discover_videos: 'vidéos',
     video_title: 'Vidéo', video_notfound: 'Vidéo introuvable',
@@ -80,6 +88,8 @@ const T = {
     st_open_support: 'Ouvrir le support', st_pick_lang: 'Choisir la langue',
   },
   de: {
+    story_reply: "Antworten…", story_none: "Keine aktiven Stories", st_delete_story: "Story löschen", gallery: "Galerie", camera_perm: "Kamerazugriff erforderlich", allow: "Erlauben", recording: "Aufnahme…", preview: "Vorschau", rec_ok: "Video erfolgreich aufgenommen!", continue_btn: "Weiter →", rec_again: "Neu aufnehmen", edit_profile: "Profil bearbeiten", saved: "Gespeichert", analytics: "Statistiken", monetization: "Monetarisierung", logout_menu: "Abmelden", share_profile: "Profil teilen",
+
     feed_empty: 'Noch keine Videos.', feed_reprises: '🔄 Virale Wiederholungen',
     discover_title: 'Entdecken', discover_tags: 'Im Trend', discover_empty: 'Noch keine Videos.', discover_videos: 'Videos',
     video_title: 'Video', video_notfound: 'Video nicht gefunden',
@@ -96,6 +106,8 @@ const T = {
     st_open_support: 'Support öffnen', st_pick_lang: 'Sprache wählen',
   },
   it: {
+    story_reply: "Rispondi…", story_none: "Nessuna story attiva", st_delete_story: "Elimina story", gallery: "Galleria", camera_perm: "Serve accesso alla fotocamera", allow: "Consenti", recording: "Registrazione…", preview: "Anteprima", rec_ok: "Video registrato!", continue_btn: "Continua →", rec_again: "Registra di nuovo", edit_profile: "Modifica profilo", saved: "Salvati", analytics: "Statistiche", monetization: "Monetizzazione", logout_menu: "Esci", share_profile: "Condividi profilo",
+
     feed_empty: 'Ancora nessun video.', feed_reprises: '🔄 Repliche virali',
     discover_title: 'Scopri', discover_tags: 'Di tendenza', discover_empty: 'Ancora nessun video.', discover_videos: 'video',
     video_title: 'Video', video_notfound: 'Video non trovato',
@@ -112,6 +124,8 @@ const T = {
     st_open_support: 'Apri supporto', st_pick_lang: 'Scegli la lingua',
   },
   ja: {
+    story_reply: "返信…", story_none: "アクティブなストーリーなし", st_delete_story: "ストーリー削除", gallery: "ギャラリー", camera_perm: "カメラへのアクセスが必要です", allow: "許可", recording: "録画中…", preview: "プレビュー", rec_ok: "動画を録画しました！", continue_btn: "続ける →", rec_again: "再録画", edit_profile: "プロフィール編集", saved: "保存済み", analytics: "統計", monetization: "収益化", logout_menu: "ログアウト", share_profile: "プロフィールを共有",
+
     feed_empty: 'まだ動画がありません。', feed_reprises: '🔄 バイラル再放送',
     discover_title: '見つける', discover_tags: 'トレンド', discover_empty: 'まだ動画がありません。', discover_videos: '本',
     video_title: '動画', video_notfound: '動画が見つかりません',

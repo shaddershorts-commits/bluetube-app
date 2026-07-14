@@ -107,14 +107,16 @@ export const blueAPI = {
           const token = await getToken();
           return api(`blue-profile?action=my-videos&token=${encodeURIComponent(token)}`);
     },
-    // Notificacoes do usuario logado (badge + lista). Retorna { notifications, unread }.
+    // Notificacoes do usuario logado. FIX 2026-07-14: blue-profile lia a
+    // tabela LEGADA blue_notifications (inexistente, sempre []) — a viva e
+    // blue_notificacoes via blue-interact. Retorna { notificacoes, unread }.
     notificacoes: async () => {
           const token = await getToken();
-          return api(`blue-profile?action=notifications&token=${encodeURIComponent(token)}`);
+          return api('blue-interact', { method: 'POST', body: JSON.stringify({ action: 'notificacoes', token }) });
     },
     marcarNotificacoesLidas: async () => {
           const token = await getToken();
-          return api('blue-profile', { method: 'POST', body: JSON.stringify({ action: 'mark-notifications-read', token }) });
+          return api('blue-interact', { method: 'POST', body: JSON.stringify({ action: 'marcar-lidas', token }) });
     },
     // Analytics do criador (visoes/curtidas/saves agregados + lista videos).
     analytics: async () => {
@@ -191,6 +193,53 @@ export const blueAPI = {
     },
 
     // Stories
+    // ── STORIES (viewer estilo Instagram) ─────────────────────────────────
+    storyVer: async (story_id) => {
+          const token = await getToken();
+          return api(`blue-stories?action=ver&story_id=${encodeURIComponent(story_id)}&token=${encodeURIComponent(token)}`);
+    },
+    storyReagir: async (story_id, emoji) => {
+          const token = await getToken();
+          return api('blue-stories', { method: 'POST', body: JSON.stringify({ action: 'reagir', token, story_id, emoji }) });
+    },
+    storyReply: async (story_id, texto) => {
+          const token = await getToken();
+          return api('blue-stories', { method: 'POST', body: JSON.stringify({ action: 'reply', token, story_id, texto }) });
+    },
+    storyDeletar: async (story_id) => {
+          const token = await getToken();
+          return api('blue-stories', { method: 'POST', body: JSON.stringify({ action: 'deletar', token, story_id }) });
+    },
+    // Cria story: sobe a midia direto pro bucket blue-stories (mesmo fluxo
+    // do site) e registra via action=criar. tipo: 'imagem' | 'video'.
+    storyCriar: async (mediaUri, { tipo = 'imagem', duracao, mime } = {}) => {
+          const token = await getToken();
+          if (!token) return { error: 'Login necessario' };
+          try {
+                const ext = tipo === 'video' ? 'mp4' : 'jpg';
+                const fname = Date.now() + '.' + ext;
+                const pathStorage = 'stories/' + token.substring(0, 8) + '/' + fname;
+                const url = `${SUPABASE_URL}/storage/v1/object/blue-stories/${pathStorage}`;
+                const up = await FileSystem.uploadAsync(url, mediaUri, {
+                      httpMethod: 'POST',
+                      uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+                      headers: {
+                            apikey: SUPABASE_ANON_KEY,
+                            Authorization: 'Bearer ' + SUPABASE_ANON_KEY,
+                            'Content-Type': mime || (tipo === 'video' ? 'video/mp4' : 'image/jpeg'),
+                            'x-upsert': 'true',
+                      },
+                });
+                if (up.status >= 400) return { error: 'Falha no upload do story (HTTP ' + up.status + ')' };
+                const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/blue-stories/${pathStorage}`;
+                return api('blue-stories', {
+                      method: 'POST',
+                      body: JSON.stringify({ action: 'criar', token, tipo, media_url: publicUrl, duracao: duracao || (tipo === 'video' ? 15 : 5) }),
+                });
+          } catch (e) {
+                return { error: e.message || 'Falha ao criar story' };
+          }
+    },
     storiesFeed: async () => {
           const token = await getToken();
           return api(`blue-stories?action=feed&token=${encodeURIComponent(token)}`);
@@ -347,7 +396,7 @@ export const blueAPI = {
     //   username:     lowercase a-z0-9_. (sluggified no backend), min 3 chars
     //   avatar_data:  data:image/jpeg;base64,... (max 2MB). Backend faz upload
     //                 pro Supabase Storage e devolve avatar_url.
-    atualizarPerfil: async ({ display_name, bio, username, avatar_data } = {}) => {
+    atualizarPerfil: async ({ display_name, bio, username, avatar_data, link_url, link_label } = {}) => {
           const token = await getToken();
           if (!token) return { error: 'Login necessario' };
           return api('blue-profile', {
@@ -359,6 +408,8 @@ export const blueAPI = {
                       ...(bio !== undefined && { bio }),
                       ...(username !== undefined && { username }),
                       ...(avatar_data !== undefined && { avatar_data }),
+                      ...(link_url !== undefined && { link_url }),
+                      ...(link_label !== undefined && { link_label }),
                 }),
           });
     },

@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import * as MediaLibrary from 'expo-media-library';
+import * as ImagePicker from 'expo-image-picker';
 import { COLORS } from '../constants';
 
 export default function CameraScreen() {
@@ -35,6 +36,23 @@ export default function CameraScreen() {
 
   const stopRecording = () => {
     cameraRef.current?.stopRecording();
+  };
+
+  // Publicar video ja existente da galeria (nao so gravar na hora)
+  const pickFromGallery = async () => {
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) { Alert.alert('Permissão', 'Libera o acesso à galeria pra escolher um vídeo.'); return; }
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+        quality: 1,
+        videoMaxDuration: 60,
+      });
+      if (res.canceled || !res.assets?.length) return;
+      const asset = res.assets[0];
+      const durSec = Math.min(60, Math.max(1, Math.round((asset.duration || 30000) / 1000)));
+      nav.navigate('PostVideo', { videoUri: asset.uri, duration: durSec });
+    } catch (e) { Alert.alert('Erro', e.message || 'Não deu pra abrir a galeria.'); }
   };
 
   const saveAndPublish = async () => {
@@ -114,11 +132,18 @@ export default function CameraScreen() {
       </SafeAreaView>
 
       <View style={styles.controls}>
-        <TouchableOpacity
-          onPress={recording ? stopRecording : startRecording}
-          style={[styles.recBtn, recording && styles.recBtnActive]}>
-          <View style={[styles.recInner, recording && styles.recInnerActive]} />
-        </TouchableOpacity>
+        <View style={styles.controlsRow}>
+          <View style={{ width: 52 }} />
+          <TouchableOpacity
+            onPress={recording ? stopRecording : startRecording}
+            style={[styles.recBtn, recording && styles.recBtnActive]}>
+            <View style={[styles.recInner, recording && styles.recInnerActive]} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={pickFromGallery} style={styles.galleryBtn} disabled={recording}>
+            <Ionicons name="images-outline" color="#fff" size={24} />
+            <Text style={styles.galleryText}>Galeria</Text>
+          </TouchableOpacity>
+        </View>
         {recording && <Text style={styles.recText}>Gravando…</Text>}
       </View>
     </View>
@@ -138,6 +163,9 @@ const styles = StyleSheet.create({
   modeText: { color: 'rgba(255,255,255,.6)', fontSize: 12, fontWeight: '700' },
   modeActive: { color: '#fff' },
   controls: { position: 'absolute', bottom: 40, left: 0, right: 0, alignItems: 'center', gap: 10 },
+  controlsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 28 },
+  galleryBtn: { width: 52, alignItems: 'center', gap: 3 },
+  galleryText: { color: '#fff', fontSize: 10, fontWeight: '600' },
   recBtn: { width: 78, height: 78, borderRadius: 39, borderWidth: 4, borderColor: 'rgba(255,255,255,.3)', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,.1)' },
   recBtnActive: { borderColor: 'rgba(239,68,68,.5)' },
   recInner: { width: 58, height: 58, borderRadius: 29, backgroundColor: '#fff' },

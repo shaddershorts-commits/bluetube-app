@@ -149,6 +149,9 @@ export default function LoginScreen({ navigation, route }) {
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
+            autoComplete="email"
+            textContentType="emailAddress"
+            importantForAutofill="yes"
             onFocus={() => setEmailFocus(true)}
             onBlur={() => setEmailFocus(false)}
           />
@@ -165,6 +168,9 @@ export default function LoginScreen({ navigation, route }) {
             secureTextEntry={!showPwd}
             autoCapitalize="none"
             autoCorrect={false}
+            autoComplete="password"
+            textContentType="password"
+            importantForAutofill="yes"
             onFocus={() => setPwdFocus(true)}
             onBlur={() => setPwdFocus(false)}
           />

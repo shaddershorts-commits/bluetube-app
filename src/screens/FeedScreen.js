@@ -2,6 +2,7 @@ import { useEffect, useCallback, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Animated, useWindowDimensions } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useIsFocused } from '@react-navigation/native';
 import { useT } from '../i18n';
 import { useAuthStore, useFeedStore } from '../store';
 import VideoCard from '../components/VideoCard';
@@ -15,8 +16,20 @@ let _popupShownThisSession = false;
 export default function FeedScreen() {
   const { videos, addVideos, setVideos, cursor, setCursor, hasMore, setHasMore, isLoading, setLoading, setCurrentIndex, feedMode, setFeedMode } = useFeedStore();
   const user = useAuthStore((s) => s.user);
+  const setStoryUsers = useFeedStore((s) => s.setStoryUsers);
+  const isFocused = useIsFocused();
   const t = useT();
   const listRef = useRef(null);
+
+  // Stories ativos: alimenta o anel azul nos avatares dos videos (tocar no
+  // avatar com anel abre o StoryViewer). Recarrega sempre que o feed foca.
+  useEffect(() => {
+    if (!isFocused) return;
+    blueAPI.storiesFeed().then((d) => {
+      const gs = (d && d.users) || [];
+      setStoryUsers(new Set(gs.filter((g) => Array.isArray(g.stories) && g.stories.length > 0).map((g) => g.user_id)));
+    }).catch(() => {});
+  }, [isFocused]);
   const insets = useSafeAreaInsets();
   const { height: winH } = useWindowDimensions();
   // Pill flutuante (estilo Instagram): o video ocupa a tela INTEIRA e a barra

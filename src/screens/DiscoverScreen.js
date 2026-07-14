@@ -65,11 +65,11 @@ export default function DiscoverScreen() {
     load(false);
   };
 
-  const renderVideo = ({ item: v }) => (
+  const renderVideo = ({ item: v, index }) => (
     <TouchableOpacity
       style={[styles.card, { width: cardW, height: cardH }]}
       activeOpacity={0.75}
-      onPress={() => nav.navigate('Video', { video: v, video_id: v.id })}>
+      onPress={() => nav.navigate('Video', { videos, startIndex: index, mode: 'explore', cursor: cursorRef.current })}>
       {v.thumbnail_url ? (
         <Image source={{ uri: v.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
       ) : (

@@ -73,7 +73,7 @@ export default function HashtagScreen() {
                   key={v.id}
                   style={[styles.gridCard, { width: cardW, height: cardH }]}
                   activeOpacity={0.85}
-                  onPress={() => nav.navigate('Video', { video: v, video_id: v.id })}>
+                  onPress={() => nav.navigate('Video', { videos, startIndex: videos.indexOf(v), mode: 'list' })}>
                   {v.thumbnail_url ? (
                     <Image source={{ uri: v.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
                   ) : (

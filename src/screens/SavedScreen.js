@@ -26,7 +26,10 @@ export default function SavedScreen() {
   const load = useCallback(async () => {
     try {
       const d = await blueAPI.meusSalvos();
-      setVideos((d && d.videos) || []);
+      // FIX 2026-07-14: backend responde { salvos: [{ video: {...} }] } — o
+      // parse antigo lia d.videos (inexistente) e a tela ficava sempre vazia.
+      const lista = (d && d.salvos) || [];
+      setVideos(lista.map((s) => s.video).filter(Boolean));
     } catch (e) {
       console.error('[SavedScreen] erro:', e?.message || e);
     }
@@ -71,7 +74,7 @@ export default function SavedScreen() {
             {videos.map((v) => (
               <TouchableOpacity
                 key={v.id}
-                onPress={() => nav.navigate('Video', { video: v, video_id: v.id })}
+                onPress={() => nav.navigate('Video', { videos, startIndex: videos.indexOf(v), mode: 'list' })}
                 activeOpacity={0.8}
                 style={[styles.card, { width: cardW, height: cardH }]}>
                 {v.thumbnail_url ? (

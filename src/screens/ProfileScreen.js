@@ -98,6 +98,32 @@ export default function ProfileScreen() {
 
   const sortedVideos = useMemo(() => sortVideos(videos, sortMode), [videos, sortMode]);
 
+  // Criar story de 24h: escolhe foto ou video da galeria, sobe e registra.
+  const criarStory = async () => {
+    try {
+      const ImagePicker = require('expo-image-picker');
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) { Alert.alert('Permissão', 'Libera o acesso à galeria pra postar um story.'); return; }
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.All,
+        quality: 0.85,
+        videoMaxDuration: 15,
+      });
+      if (res.canceled || !res.assets?.length) return;
+      const asset = res.assets[0];
+      const isVideo = asset.type === 'video';
+      const r = await blueAPI.storyCriar(asset.uri, {
+        tipo: isVideo ? 'video' : 'imagem',
+        duracao: isVideo ? Math.min(15, Math.round((asset.duration || 15000) / 1000)) : 5,
+        mime: isVideo ? 'video/mp4' : 'image/jpeg',
+      });
+      if (r?.ok || r?.story) Alert.alert('✓ Story publicado!', 'Ele fica no ar por 24 horas.');
+      else Alert.alert('Erro', r?.error || 'Não deu pra publicar o story. Tenta de novo.');
+    } catch (e) {
+      Alert.alert('Erro', e.message || 'Não deu pra publicar o story.');
+    }
+  };
+
   const totalViews = videos.reduce((a, v) => a + (v.views || 0), 0);
   const totalLikes = videos.reduce((a, v) => a + (v.likes || 0), 0);
 
@@ -127,7 +153,13 @@ export default function ProfileScreen() {
 
         {/* Header estilo TikTok: avatar + stats inline */}
         <View style={styles.header}>
-          <Avatar uri={profile?.avatar_url} initial={profile?.display_name || profile?.username} size={96} />
+          <View>
+            <Avatar uri={profile?.avatar_url} initial={profile?.display_name || profile?.username} size={96} />
+            {/* "+" azul = criar story de 24h (estilo Instagram/TikTok) */}
+            <TouchableOpacity style={styles.storyPlus} onPress={criarStory} hitSlop={8} activeOpacity={0.8}>
+              <Ionicons name="add" size={18} color="#fff" />
+            </TouchableOpacity>
+          </View>
           <Text style={styles.name}>{profile?.display_name || profile?.username || '—'}</Text>
           <Text style={styles.username}>@{profile?.username || 'blue'}</Text>
 
@@ -139,6 +171,12 @@ export default function ProfileScreen() {
           </View>
 
           {profile?.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
+          {profile?.link_url ? (
+            <TouchableOpacity style={styles.linkRow} onPress={() => Linking.openURL(profile.link_url).catch(() => {})}>
+              <Ionicons name="link" size={14} color={COLORS.neon} />
+              <Text style={styles.linkText} numberOfLines={1}>{profile.link_label || profile.link_url.replace(/^https?:\/\//, '')}</Text>
+            </TouchableOpacity>
+          ) : null}
 
           {/* Botoes de acao */}
           <View style={styles.actionRow}>
@@ -186,7 +224,7 @@ export default function ProfileScreen() {
                 video={v}
                 width={cardW}
                 height={cardH}
-                onPress={() => nav.navigate('Video', { video: v, video_id: v.id })}
+                onPress={() => nav.navigate('Video', { videos, startIndex: videos.indexOf(v), mode: 'user', creator: profile })}
               />
             ))
           )}
@@ -264,6 +302,13 @@ function MenuItem({ icon, label, onPress, color }) {
 }
 
 const styles = StyleSheet.create({
+  storyPlus: {
+    position: 'absolute', bottom: 0, right: -2, width: 28, height: 28, borderRadius: 14,
+    backgroundColor: COLORS.neon, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2.5, borderColor: COLORS.background,
+  },
+  linkRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8, maxWidth: '85%' },
+  linkText: { color: COLORS.neon, fontSize: 13, fontWeight: '600' },
   container: { flex: 1, backgroundColor: COLORS.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.background },
 

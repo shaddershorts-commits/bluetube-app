@@ -50,7 +50,7 @@ export default function NotificationsScreen() {
   const load = useCallback(async () => {
     try {
       const d = await blueAPI.notificacoes();
-      setNotifs((d && d.notifications) || []);
+      setNotifs((d && (d.notificacoes || d.notifications)) || []);
       // Marca todas como lidas (best-effort)
       blueAPI.marcarNotificacoesLidas().catch(() => {});
     } catch (e) {
@@ -94,14 +94,15 @@ export default function NotificationsScreen() {
             const tipo = item.tipo || 'default';
             const icon = TIPO_ICON[tipo] || TIPO_ICON.default;
             const cor = TIPO_COR[tipo] || TIPO_COR.default;
+            const dados = item.dados || {};
             const onPress = () => {
-              // Heuristica: se tem video_id no payload, abre video. Se tem from_user_id, abre perfil.
-              if (item.video_id) nav.navigate('Video', { video_id: item.video_id });
-              else if (item.from_user_id) nav.navigate('PerfilUsuario', { user_id: item.from_user_id });
-              else if (item.from_username) nav.navigate('PerfilUsuario', { username: item.from_username });
+              // blue_notificacoes guarda os alvos em dados{video_id,from_user_id,conv_id}
+              if (dados.conv_id || tipo === 'mensagem') nav.navigate('Main', { screen: 'Chat' });
+              else if (dados.video_id || item.video_id) nav.navigate('Video', { video_id: dados.video_id || item.video_id });
+              else if (dados.from_user_id || item.from_user_id) nav.navigate('PerfilUsuario', { user_id: dados.from_user_id || item.from_user_id });
             };
             return (
-              <TouchableOpacity onPress={onPress} style={[styles.row, !item.read && styles.rowUnread]} activeOpacity={0.7}>
+              <TouchableOpacity onPress={onPress} style={[styles.row, !(item.lida ?? item.read) && styles.rowUnread]} activeOpacity={0.7}>
                 <View style={[styles.iconWrap, { backgroundColor: cor + '22' }]}>
                   <Ionicons name={icon} size={20} color={cor} />
                 </View>

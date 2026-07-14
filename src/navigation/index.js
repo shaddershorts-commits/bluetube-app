@@ -35,6 +35,7 @@ import AnalyticsScreen from '../screens/AnalyticsScreen';
 import MonetizacaoScreen from '../screens/MonetizacaoScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import VideoScreen from '../screens/VideoScreen';
+import StoryViewerScreen from '../screens/StoryViewerScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -123,41 +124,45 @@ function MainTabs() {
           <Tab.Navigator
         screenOptions={({ route }) => ({
                   headerShown: false,
-                  // Pill flutuante estilo Instagram: barra centralizada, suspensa,
-                  // cantos arredondados, sem labels; o conteudo flui por tras.
+                  // Pill flutuante estilo Instagram: menor, icones centralizados
+                  // verticalmente, fundo mais claro com mais blur (liquid glass).
                   tabBarStyle: {
                               position: 'absolute',
                               bottom: Math.max(insets.bottom, 10) + 8,
-                              left: 24,
-                              right: 24,
-                              height: 60,
-                              borderRadius: 30,
+                              left: 34,
+                              right: 34,
+                              height: 54,
+                              borderRadius: 27,
                               backgroundColor: 'transparent',
                               borderTopWidth: 0,
                               overflow: 'hidden',
                               elevation: 0,
                               shadowColor: '#000',
-                              shadowOpacity: 0.35,
-                              shadowRadius: 16,
-                              shadowOffset: { width: 0, height: 8 },
+                              shadowOpacity: 0.3,
+                              shadowRadius: 14,
+                              shadowOffset: { width: 0, height: 6 },
                   },
-                  tabBarItemStyle: { paddingTop: 10 },
+                  tabBarItemStyle: { height: 54, justifyContent: 'center', alignItems: 'center', paddingTop: 0, paddingBottom: 0 },
                   tabBarShowLabel: false,
                   tabBarBackground: () => (
-                              <View style={[StyleSheet.absoluteFill, { borderRadius: 30, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }]}>
-                                <BlurView intensity={blurT.heavy} tint="dark" style={StyleSheet.absoluteFill} />
-                                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(10,16,32,0.72)' }]} />
+                              <View style={[StyleSheet.absoluteFill, { borderRadius: 27, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)' }]}>
+                                <BlurView intensity={95} tint="light" style={StyleSheet.absoluteFill} />
+                                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(90,130,190,0.22)' }]} />
                               </View>
                   ),
                   tabBarActiveTintColor: COLORS.neon,
-                  tabBarInactiveTintColor: COLORS.textDim,
+                  tabBarInactiveTintColor: 'rgba(255,255,255,0.75)',
                   tabBarIcon: ({ color, focused }) => {
                               if (route.name === 'Perfil') return <PerfilTabIcon color={color} focused={focused} />;
                               const icons = { Feed: 'home', Descobrir: 'search', Camera: 'add-circle', Chat: 'chatbubble' };
                               const name = icons[route.name] + (focused ? '' : '-outline');
-                              return <Ionicons name={name} color={color} size={route.name === 'Camera' ? 34 : 24} />;
+                              return <Ionicons name={name} color={color} size={route.name === 'Camera' ? 30 : 22} />;
 },
-                                       })}>
+                                       })}
+        screenListeners={({ navigation }) => ({
+                  // Double-tap no icone da aba ATIVA recarregava a tela — bloqueia.
+                  tabPress: (e) => { if (navigation.isFocused()) e.preventDefault(); },
+        })}>
       <Tab.Screen name="Feed" component={FeedScreen} />
         <Tab.Screen name="Descobrir" component={DiscoverScreen} />
         <Tab.Screen name="Camera" component={CameraScreen} options={{ tabBarLabel: '' }} />
@@ -224,6 +229,7 @@ export default function Navigation() {
                        <Stack.Screen name="Monetizacao" component={MonetizacaoScreen} />
                        <Stack.Screen name="Settings" component={SettingsScreen} />
                        <Stack.Screen name="Video" component={VideoScreen} />
+                       <Stack.Screen name="StoryViewer" component={StoryViewerScreen} />
            </>
          )}
 </Stack.Navigator>
