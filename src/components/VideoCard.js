@@ -50,8 +50,11 @@ export default function VideoCard({ video, index, cardHeight, activeOverride }) 
   const videoRef = useRef(null);
   const nav = useNavigation();
   const { width: W } = useWindowDimensions();
-  const [liked, setLiked] = useState(false);
-  const [saved, setSaved] = useState(false);
+  // Estado inicial vem do backend (markMine): coracao/bookmark preenchidos
+  // persistem entre sessoes — antes sempre resetava pra false e parecia
+  // que a curtida "sumia".
+  const [liked, setLiked] = useState(video.liked === true);
+  const [saved, setSaved] = useState(video.saved === true);
   const [likes, setLikes] = useState(video.likes || 0);
   const [rate2x, setRate2x] = useState(false);
   const [fitMode, setFitMode] = useState(() => pickResizeMode(video.width, video.height));

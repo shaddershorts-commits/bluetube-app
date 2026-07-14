@@ -22,7 +22,13 @@ export default function ComentariosScreen({ route }) {
 
   const enviar = async () => {
     if (!texto.trim()) return;
-    await blueAPI.comentar(video_id, texto.trim());
+    // Erros eram engolidos: comentario rejeitado pelo backend sumia sem aviso
+    const r = await blueAPI.comentar(video_id, texto.trim()).catch((e) => ({ error: e.message }));
+    if (r?.error) {
+      const { Alert } = require('react-native');
+      Alert.alert('Não foi possível comentar', r.error);
+      return;
+    }
     setTexto('');
     load();
   };
@@ -33,15 +39,19 @@ export default function ComentariosScreen({ route }) {
       <FlatList
         data={comentarios}
         keyExtractor={(item, i) => String(item.id || i)}
-        renderItem={({ item }) => (
-          <View style={styles.item}>
-            <Avatar uri={item.avatar_url} initial={item.username} size={36} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.user}>@{item.username || 'blue'}</Text>
-              <Text style={styles.text}>{item.content || item.texto}</Text>
+        renderItem={({ item }) => {
+          // Backend devolve { creator: {username, display_name}, text }
+          const c = item.creator || {};
+          return (
+            <View style={styles.item}>
+              <Avatar uri={c.avatar_url || item.avatar_url} initial={c.display_name || c.username || item.username} size={36} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.user}>@{c.username || item.username || 'blue'}</Text>
+                <Text style={styles.text}>{item.text || item.content || item.texto}</Text>
+              </View>
             </View>
-          </View>
-        )}
+          );
+        }}
         ListEmptyComponent={<Text style={styles.empty}>Nenhum comentário ainda. Seja o primeiro!</Text>}
       />
       <View style={styles.inputBar}>

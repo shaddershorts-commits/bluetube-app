@@ -162,9 +162,11 @@ export const blueAPI = {
 
     // Comentarios
     comentarios: (video_id) => api(`blue-comment?video_id=${video_id}&limit=50`),
+    // FIX 2026-07-14: backend espera campo `text` — mandavamos `content` e o
+    // comentario era rejeitado silenciosamente (400) e "sumia" no reload.
     comentar: async (video_id, texto) => {
           const token = await getToken();
-          return api('blue-comment', { method: 'POST', body: JSON.stringify({ action: 'create', video_id, content: texto, token }) });
+          return api('blue-comment', { method: 'POST', body: JSON.stringify({ video_id, text: texto, token }) });
     },
 
     // Chat
