@@ -323,6 +323,17 @@ export const blueAPI = {
 
           if (onProgress) onProgress(1);
           addBreadcrumb('publicarVideo:ok', 'upload', { video_id: metaResp.video?.id });
+
+          // Transcode pos-upload (fire-and-forget): o Railway re-encoda o video
+          // com faststart + compressao — sem isso o feed baixa o arquivo inteiro
+          // antes do 1o frame (tela preta). Mesmo hook do blue.html web.
+          if (metaResp.video?.id) {
+                api('blue-upload', {
+                      method: 'POST',
+                      body: JSON.stringify({ action: 'transcode', token, video_id: metaResp.video.id }),
+                }).catch(() => {});
+          }
+
           return { ok: true, video: metaResp.video };
     },
 
