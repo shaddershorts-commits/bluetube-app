@@ -1,17 +1,24 @@
 import { useRef, useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions, Share, Animated, Pressable } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Video, ResizeMode } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useIsFocused } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
-import { useFeedStore } from '../store';
+import { useFeedStore, useAuthStore } from '../store';
 import { COLORS } from '../constants';
 import Avatar from './Avatar';
 import ActionButton from './ActionButton';
 import blueAPI from '../api';
 
 const DOUBLE_TAP_MS = 260;
+
+// Dedup de views por sessao do app: rolar pra cima/baixo re-ativava o card e
+// disparava interact('view') de novo — inflava o contador. 1 view por video
+// por sessao (mesmo criterio do site).
+const _viewedThisSession = new Set();
+const SESSION_ID = 'app-' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 
 // Decide resizeMode baseado no aspect ratio (w/h):
 //   < 0.85 => portrait/vertical -> COVER (preenche a tela, como TikTok)
@@ -22,9 +29,14 @@ function pickResizeMode(w, h) {
   return aspect < 0.85 ? ResizeMode.COVER : ResizeMode.CONTAIN;
 }
 
-export default function VideoCard({ video, index, cardHeight }) {
+export default function VideoCard({ video, index, cardHeight, activeOverride }) {
   const currentIndex = useFeedStore((s) => s.currentIndex);
-  const isActive = currentIndex === index;
+  const appActive = useFeedStore((s) => s.appActive);
+  const user = useAuthStore((s) => s.user);
+  // isFocused: pausa o video quando o user troca de aba (Descobrir/Chat/Perfil)
+  // e retoma ao voltar — antes continuava tocando em segundo plano.
+  const isFocused = useIsFocused();
+  const isActive = (activeOverride === true || currentIndex === index) && isFocused && appActive !== false;
   const videoRef = useRef(null);
   const nav = useNavigation();
   const { width: W } = useWindowDimensions();
@@ -45,18 +57,23 @@ export default function VideoCard({ video, index, cardHeight }) {
   useEffect(() => {
     if (!videoRef.current) return;
     let cancelled = false;
+    const sendView = () => {
+      if (_viewedThisSession.has(video.id)) return;
+      _viewedThisSession.add(video.id);
+      blueAPI.interact('view', video.id, { user_id: user?.id, session_id: SESSION_ID }).catch(() => {});
+    };
     if (isActive) {
       (async () => {
         try {
           await videoRef.current.playAsync();
-          if (!cancelled) blueAPI.interact('view', video.id).catch(() => {});
+          if (!cancelled) sendView();
         } catch (e) {
           // Fallback: muta e tenta de novo
           try {
             await videoRef.current.setIsMutedAsync(true);
             if (!cancelled) setMuted(true);
             await videoRef.current.playAsync();
-            if (!cancelled) blueAPI.interact('view', video.id).catch(() => {});
+            if (!cancelled) sendView();
           } catch (_) {}
         }
       })();
@@ -134,6 +151,11 @@ export default function VideoCard({ video, index, cardHeight }) {
 
   const creator = video.creator || {};
   const containerStyle = [styles.container, { width: W, height: cardHeight }];
+  // Card agora ocupa a tela inteira (video atras da pill flutuante estilo
+  // Instagram). uiBottom afasta legendas/acoes da pill; na tela de video
+  // unico (activeOverride) nao ha tab bar, offset menor.
+  const insets = useSafeAreaInsets();
+  const uiBottom = insets.bottom + (activeOverride ? 28 : 100);
 
   return (
     <View style={containerStyle}>
@@ -166,14 +188,14 @@ export default function VideoCard({ video, index, cardHeight }) {
         <Ionicons name="heart" size={140} color="#ff3366" />
       </Animated.View>
 
-      <View style={styles.info}>
+      <View style={[styles.info, { bottom: uiBottom }]}>
         <TouchableOpacity onPress={() => nav.navigate('PerfilUsuario', { user_id: video.user_id })}>
           <Text style={styles.username}>@{creator.username || 'blue'}</Text>
         </TouchableOpacity>
         {video.title ? <Text style={styles.title} numberOfLines={2}>{video.title}</Text> : null}
       </View>
 
-      <View style={styles.actions}>
+      <View style={[styles.actions, { bottom: uiBottom + 44 }]}>
         <TouchableOpacity onPress={() => nav.navigate('PerfilUsuario', { user_id: video.user_id })}>
           <Avatar uri={creator.avatar_url} initial={creator.display_name || creator.username} size={48} />
         </TouchableOpacity>

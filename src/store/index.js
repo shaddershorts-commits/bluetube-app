@@ -116,6 +116,10 @@ export const useFeedStore = create((set) => ({
   // Lote 7 — feed infinito: rastreia modo do backend (fresh|seen_recycle)
   // pra disparar banner sutil na transicao.
   feedMode: 'fresh',
+  // App em foreground? (AppState) — pausa videos no background, senao o
+  // audio continua tocando com o app minimizado no Android.
+  appActive: true,
+  setAppActive: (appActive) => set({ appActive }),
   setVideos: (videos) => set({ videos }),
   addVideos: (videos) => set((s) => ({ videos: [...s.videos, ...videos] })),
   setCursor: (cursor) => set({ cursor }),

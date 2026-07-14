@@ -39,7 +39,10 @@ function ago(ts) {
   return new Date(ts).toLocaleDateString('pt-BR');
 }
 
+import { useNavigation } from '@react-navigation/native';
+
 export default function NotificationsScreen() {
+  const nav = useNavigation();
   const [notifs, setNotifs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -93,8 +96,9 @@ export default function NotificationsScreen() {
             const cor = TIPO_COR[tipo] || TIPO_COR.default;
             const onPress = () => {
               // Heuristica: se tem video_id no payload, abre video. Se tem from_user_id, abre perfil.
-              if (item.video_id) Linking.openURL(`https://bluetubeviral.com/blue-video?v=${item.video_id}`).catch(() => {});
-              else if (item.from_username) Linking.openURL(`https://bluetubeviral.com/blue?u=${item.from_username}`).catch(() => {});
+              if (item.video_id) nav.navigate('Video', { video_id: item.video_id });
+              else if (item.from_user_id) nav.navigate('PerfilUsuario', { user_id: item.from_user_id });
+              else if (item.from_username) nav.navigate('PerfilUsuario', { username: item.from_username });
             };
             return (
               <TouchableOpacity onPress={onPress} style={[styles.row, !item.read && styles.rowUnread]} activeOpacity={0.7}>

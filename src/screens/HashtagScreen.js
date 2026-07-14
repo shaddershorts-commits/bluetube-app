@@ -15,7 +15,10 @@ function formatCount(n) {
   return (n / 1_000_000).toFixed(1) + 'M';
 }
 
+import { useNavigation } from '@react-navigation/native';
+
 export default function HashtagScreen() {
+  const nav = useNavigation();
   const route = useRoute();
   const { width: W } = useWindowDimensions();
   const tag = decodeURIComponent(route.params?.tag || '');
@@ -70,7 +73,7 @@ export default function HashtagScreen() {
                   key={v.id}
                   style={[styles.gridCard, { width: cardW, height: cardH }]}
                   activeOpacity={0.85}
-                  onPress={() => Linking.openURL(`https://bluetubeviral.com/blue-video?v=${v.id}`).catch(() => {})}>
+                  onPress={() => nav.navigate('Video', { video: v, video_id: v.id })}>
                   {v.thumbnail_url ? (
                     <Image source={{ uri: v.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
                   ) : (

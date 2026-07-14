@@ -14,7 +14,10 @@ function formatCount(n) {
   return (n / 1_000_000).toFixed(1) + 'M';
 }
 
+import { useNavigation } from '@react-navigation/native';
+
 export default function SavedScreen() {
+  const nav = useNavigation();
   const { width: W } = useWindowDimensions();
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -68,7 +71,7 @@ export default function SavedScreen() {
             {videos.map((v) => (
               <TouchableOpacity
                 key={v.id}
-                onPress={() => Linking.openURL(`https://bluetubeviral.com/blue-video?v=${v.id}`).catch(() => {})}
+                onPress={() => nav.navigate('Video', { video: v, video_id: v.id })}
                 activeOpacity={0.8}
                 style={[styles.card, { width: cardW, height: cardH }]}>
                 {v.thumbnail_url ? (

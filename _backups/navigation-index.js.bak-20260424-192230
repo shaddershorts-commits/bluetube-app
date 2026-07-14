@@ -1,15 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Linking as RNLinking, Image, View, StyleSheet } from 'react-native';
+import { Linking as RNLinking, Image, View } from 'react-native';
 import * as Linking from 'expo-linking';
-import { BlurView } from 'expo-blur';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../store';
 import { COLORS } from '../constants';
-import { colors as theme, blur as blurT } from '../constants/theme';
 import blueAPI from '../api';
 import SplashScreen from '../screens/SplashScreen';
 import IntroScreen from '../screens/IntroScreen';
@@ -29,12 +26,6 @@ import LiveScreen from '../screens/LiveScreen';
 import PostVideoScreen from '../screens/PostVideoScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import HashtagScreen from '../screens/HashtagScreen';
-import SavedScreen from '../screens/SavedScreen';
-import NotificationsScreen from '../screens/NotificationsScreen';
-import AnalyticsScreen from '../screens/AnalyticsScreen';
-import MonetizacaoScreen from '../screens/MonetizacaoScreen';
-import SettingsScreen from '../screens/SettingsScreen';
-import VideoScreen from '../screens/VideoScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -76,12 +67,26 @@ const linking = {
                       path: 'blue/hashtag/:tag',
                       parse: { tag: (t) => decodeURIComponent(t) },
                 },
-                // /blue/v/:id agora abre NATIVO (VideoScreen) — antes caia no navegador
-                Video: {
-                      path: 'blue/v/:video_id',
-                      parse: { video_id: (v) => v },
-                },
           },
+    },
+    // /blue/v/:id nao mapeia pra tela nativa — abre no navegador externo
+    async getInitialURL() {
+          const url = await RNLinking.getInitialURL();
+          if (url && /\/blue\/v\/[^/?#]+/.test(url)) {
+                RNLinking.openURL(url).catch(() => {});
+                return null;
+          }
+          return url;
+    },
+    subscribe(listener) {
+          const sub = RNLinking.addEventListener('url', ({ url }) => {
+                if (/\/blue\/v\/[^/?#]+/.test(url)) {
+                      RNLinking.openURL(url).catch(() => {});
+                      return;
+                }
+                listener(url);
+          });
+          return () => sub.remove();
     },
 };
 
@@ -118,44 +123,23 @@ function PerfilTabIcon({ color, focused }) {
 }
 
 function MainTabs() {
-    const insets = useSafeAreaInsets();
     return (
           <Tab.Navigator
         screenOptions={({ route }) => ({
                   headerShown: false,
-                  // Pill flutuante estilo Instagram: barra centralizada, suspensa,
-                  // cantos arredondados, sem labels; o conteudo flui por tras.
                   tabBarStyle: {
-                              position: 'absolute',
-                              bottom: Math.max(insets.bottom, 10) + 8,
-                              left: 24,
-                              right: 24,
-                              height: 60,
-                              borderRadius: 30,
-                              backgroundColor: 'transparent',
-                              borderTopWidth: 0,
-                              overflow: 'hidden',
-                              elevation: 0,
-                              shadowColor: '#000',
-                              shadowOpacity: 0.35,
-                              shadowRadius: 16,
-                              shadowOffset: { width: 0, height: 8 },
+                              backgroundColor: COLORS.background,
+                              borderTopColor: COLORS.border,
+                              height: 60, paddingBottom: 6, paddingTop: 6,
                   },
-                  tabBarItemStyle: { paddingTop: 10 },
-                  tabBarShowLabel: false,
-                  tabBarBackground: () => (
-                              <View style={[StyleSheet.absoluteFill, { borderRadius: 30, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }]}>
-                                <BlurView intensity={blurT.heavy} tint="dark" style={StyleSheet.absoluteFill} />
-                                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(10,16,32,0.72)' }]} />
-                              </View>
-                  ),
                   tabBarActiveTintColor: COLORS.neon,
                   tabBarInactiveTintColor: COLORS.textDim,
+                  tabBarLabelStyle: { fontSize: 10 },
                   tabBarIcon: ({ color, focused }) => {
                               if (route.name === 'Perfil') return <PerfilTabIcon color={color} focused={focused} />;
                               const icons = { Feed: 'home', Descobrir: 'search', Camera: 'add-circle', Chat: 'chatbubble' };
                               const name = icons[route.name] + (focused ? '' : '-outline');
-                              return <Ionicons name={name} color={color} size={route.name === 'Camera' ? 34 : 24} />;
+                              return <Ionicons name={name} color={color} size={route.name === 'Camera' ? 38 : 24} />;
 },
                                        })}>
       <Tab.Screen name="Feed" component={FeedScreen} />
@@ -218,12 +202,6 @@ export default function Navigation() {
                        <Stack.Screen name="PostVideo" component={PostVideoScreen} />
                        <Stack.Screen name="EditProfile" component={EditProfileScreen} />
                        <Stack.Screen name="Hashtag" component={HashtagScreen} />
-                       <Stack.Screen name="Saved" component={SavedScreen} />
-                       <Stack.Screen name="Notifications" component={NotificationsScreen} />
-                       <Stack.Screen name="Analytics" component={AnalyticsScreen} />
-                       <Stack.Screen name="Monetizacao" component={MonetizacaoScreen} />
-                       <Stack.Screen name="Settings" component={SettingsScreen} />
-                       <Stack.Screen name="Video" component={VideoScreen} />
            </>
          )}
 </Stack.Navigator>

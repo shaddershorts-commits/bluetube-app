@@ -1,17 +1,15 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator,
-  RefreshControl, Alert, Image, Modal, Pressable, Linking, Share, useWindowDimensions,
+  RefreshControl, Alert, Image, Modal, Pressable, Linking, useWindowDimensions,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import Avatar from '../components/Avatar';
 import blueAPI from '../api';
 import { useAuthStore } from '../store';
 import { COLORS } from '../constants';
-import { colors as theme, blur as blurT, radius } from '../constants/theme';
 
 const SORT_MODES = [
   { key: 'recent', label: 'Recentes' },
@@ -78,22 +76,6 @@ export default function ProfileScreen() {
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Sair', style: 'destructive', onPress: logout },
     ]);
-  };
-
-  const handleSharePerfil = async () => {
-    setMenuOpen(false);
-    const username = profile?.username || '';
-    if (!username) return Alert.alert('Erro', 'Username nao disponivel');
-    const url = `https://bluetubeviral.com/blue?u=${username}`;
-    try {
-      await Share.share({
-        message: `Confere meu perfil no BlueTube: ${url}`,
-        url, // iOS-only attachment
-        title: `@${username} no BlueTube`,
-      });
-    } catch (e) {
-      // Usuario cancelou ou erro do OS — silencioso
-    }
   };
 
   const sortedVideos = useMemo(() => sortVideos(videos, sortMode), [videos, sortMode]);
@@ -186,36 +168,33 @@ export default function ProfileScreen() {
                 video={v}
                 width={cardW}
                 height={cardH}
-                onPress={() => nav.navigate('Video', { video: v, video_id: v.id })}
+                onPress={() => Linking.openURL(`https://bluetubeviral.com/blue-video?v=${v.id}`).catch(() => {})}
               />
             ))
           )}
         </View>
       </ScrollView>
 
-      {/* Menu hamburger (bottom sheet) — Liquid Glass */}
+      {/* Menu hamburger (bottom sheet) */}
       <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
         <Pressable style={styles.menuBackdrop} onPress={() => setMenuOpen(false)}>
-          <BlurView intensity={blurT.heavy} tint="dark" style={StyleSheet.absoluteFill} />
           <Pressable style={[styles.menuSheet, { paddingBottom: insets.bottom + 12 }]}>
-            <BlurView intensity={blurT.medium} tint="dark" style={StyleSheet.absoluteFill} />
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.glassDark }]} pointerEvents="none" />
             <View style={styles.menuHandle} />
             <MenuItem icon="person-outline" label="Editar perfil" onPress={() => { setMenuOpen(false); nav.navigate('EditProfile'); }} />
-            <MenuItem icon="bookmark-outline" label="Salvos" onPress={() => { setMenuOpen(false); nav.navigate('Saved'); }} />
-            <MenuItem icon="notifications-outline" label="Notificações" onPress={() => { setMenuOpen(false); nav.navigate('Notifications'); }} />
+            <MenuItem icon="bookmark-outline" label="Salvos" onPress={() => { setMenuOpen(false); Alert.alert('Em breve', 'Lista de salvos em construção'); }} />
+            <MenuItem icon="notifications-outline" label="Notificações" onPress={() => { setMenuOpen(false); nav.navigate('Chat'); }} />
             <MenuItem
               icon="analytics-outline"
               label="Analytics"
-              onPress={() => { setMenuOpen(false); nav.navigate('Analytics'); }}
+              onPress={() => { setMenuOpen(false); Alert.alert('Em breve', 'Analytics completo disponível em bluetubeviral.com/blue-analytics'); }}
             />
             <MenuItem
               icon="cash-outline"
               label={stats?.tem_conta ? `Monetização — R$${(stats.saldo_disponivel || 0).toFixed(2)}` : 'Monetização'}
-              onPress={() => { setMenuOpen(false); nav.navigate('Monetizacao'); }}
+              onPress={() => { setMenuOpen(false); Alert.alert('Em breve', 'Saques via app em construção — use o site por enquanto'); }}
             />
-            <MenuItem icon="settings-outline" label="Configurações" onPress={() => { setMenuOpen(false); nav.navigate('Settings'); }} />
-            <MenuItem icon="share-social-outline" label="Compartilhar perfil" onPress={handleSharePerfil} />
+            <MenuItem icon="settings-outline" label="Configurações" onPress={() => { setMenuOpen(false); Alert.alert('Em breve', 'Configurações em construção'); }} />
+            <MenuItem icon="share-social-outline" label="Compartilhar perfil" onPress={() => { setMenuOpen(false); Alert.alert('Link copiado', `https://bluetubeviral.com/blue?u=${profile?.username || ''}`); }} />
             <View style={styles.menuDivider} />
             <MenuItem icon="log-out-outline" label="Sair" onPress={handleLogout} color={COLORS.red} />
           </Pressable>
@@ -343,20 +322,15 @@ const styles = StyleSheet.create({
   emptyHint: { color: COLORS.textDim, fontSize: 12, marginTop: 6 },
 
   menuBackdrop: {
-    flex: 1, backgroundColor: 'rgba(2,8,23,0.45)', // semi-transparente, BlurView faz o resto
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.55)',
     justifyContent: 'flex-end',
   },
   menuSheet: {
-    backgroundColor: 'transparent', // BlurView + glassDark tint cobrem
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    backgroundColor: '#0a0f1a',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     paddingTop: 8,
     paddingHorizontal: 14,
-    overflow: 'hidden', // critico pra BlurView respeitar borderRadius
-    borderTopWidth: 1,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
   },
   menuHandle: {
     width: 42, height: 4, borderRadius: 2,

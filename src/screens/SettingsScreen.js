@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Alert, Platform,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Alert, Platform, Modal, Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
@@ -8,6 +8,7 @@ import Header from '../components/Header';
 import GlassCard from '../components/GlassCard';
 import { useAuthStore } from '../store';
 import { COLORS } from '../constants';
+import { LANGS, useLangStore, useT } from '../i18n';
 
 function SettingItem({ icon, label, value, onPress, danger }) {
   return (
@@ -36,6 +37,11 @@ function Section({ title, children }) {
 export default function SettingsScreen() {
   const { user, logout } = useAuthStore();
   const [appVersion, setAppVersion] = useState('');
+  const [langModal, setLangModal] = useState(false);
+  const lang = useLangStore((s) => s.lang);
+  const setLang = useLangStore((s) => s.setLang);
+  const t = useT();
+  const currentLang = LANGS.find((l) => l.code === lang) || LANGS[0];
 
   useEffect(() => {
     try {
@@ -46,92 +52,92 @@ export default function SettingsScreen() {
   }, []);
 
   const handleLogout = () => {
-    Alert.alert('Sair', 'Tem certeza?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Sair', style: 'destructive', onPress: logout },
+    Alert.alert(t('st_logout_t'), t('st_sure'), [
+      { text: t('st_cancel'), style: 'cancel' },
+      { text: t('st_logout_t'), style: 'destructive', onPress: logout },
     ]);
   };
 
   const handleDeleteAccount = () => {
     Alert.alert(
-      'Excluir conta',
-      'Excluir conta é irreversível. Pra excluir, abra o suporte na versão web.',
+      t('st_delete'),
+      t('st_delete_msg'),
       [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Abrir suporte', onPress: () => Linking.openURL('https://bluetubeviral.com/suporte').catch(() => {}) },
+        { text: t('st_cancel'), style: 'cancel' },
+        { text: t('st_open_support'), onPress: () => Linking.openURL('https://bluetubeviral.com/suporte').catch(() => {}) },
       ]
     );
   };
 
   return (
     <View style={{ flex: 1, backgroundColor: COLORS.background }}>
-      <Header title="Configurações" showBack />
+      <Header title={t('st_title')} showBack />
       <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
 
-        <Section title="Conta">
+        <Section title={t('st_account')}>
           <SettingItem
             icon="mail-outline"
-            label="Email"
+            label={t('st_email')}
             value={user?.email || '—'}
-            onPress={() => Alert.alert('Email', user?.email || 'Sem email cadastrado')}
+            onPress={() => Alert.alert(t('st_email'), user?.email || t('st_email_none'))}
           />
           <SettingItem
             icon="key-outline"
-            label="Mudar senha"
-            value="Via versão web"
+            label={t('st_password')}
+            value={t('st_via_web')}
             onPress={() => Linking.openURL('https://bluetubeviral.com/blue?action=change-password').catch(() => {})}
           />
         </Section>
 
-        <Section title="Conteúdo">
+        <Section title={t('st_content')}>
           <SettingItem
             icon="language-outline"
-            label="Idioma"
-            value="Português (BR)"
-            onPress={() => Alert.alert('Em breve', 'Outros idiomas em desenvolvimento. Por enquanto: Português.')}
+            label={t('st_lang')}
+            value={`${currentLang.flag} ${currentLang.name}`}
+            onPress={() => setLangModal(true)}
           />
           <SettingItem
             icon="notifications-outline"
-            label="Notificações push"
-            value="Em breve"
-            onPress={() => Alert.alert('Em breve', 'Configuração de push em desenvolvimento')}
+            label={t('st_push')}
+            value={t('st_soon')}
+            onPress={() => Alert.alert(t('st_soon'), t('st_push_soon'))}
           />
         </Section>
 
-        <Section title="Sobre">
+        <Section title={t('st_about')}>
           <SettingItem
             icon="document-text-outline"
-            label="Termos de uso"
+            label={t('st_terms')}
             onPress={() => Linking.openURL('https://bluetubeviral.com/termos').catch(() => {})}
           />
           <SettingItem
             icon="shield-outline"
-            label="Política de privacidade"
+            label={t('st_privacy')}
             onPress={() => Linking.openURL('https://bluetubeviral.com/privacidade').catch(() => {})}
           />
           <SettingItem
             icon="help-circle-outline"
-            label="Suporte"
+            label={t('st_support')}
             onPress={() => Linking.openURL('https://bluetubeviral.com/suporte').catch(() => {})}
           />
           <SettingItem
             icon="information-circle-outline"
-            label="Versão do app"
-            value={appVersion || 'desconhecida'}
+            label={t('st_version')}
+            value={appVersion || '—'}
             onPress={() => {}}
           />
         </Section>
 
-        <Section title="Conta — perigoso">
+        <Section title={t('st_danger')}>
           <SettingItem
             icon="log-out-outline"
-            label="Sair desta conta"
+            label={t('st_logout')}
             onPress={handleLogout}
             danger
           />
           <SettingItem
             icon="trash-outline"
-            label="Excluir conta"
+            label={t('st_delete')}
             onPress={handleDeleteAccount}
             danger
           />
@@ -139,6 +145,26 @@ export default function SettingsScreen() {
 
         <Text style={styles.platform}>{Platform.OS === 'android' ? 'Android' : Platform.OS} · BlueTube</Text>
       </ScrollView>
+
+      {/* Seletor de idioma — antes era um Alert "Em breve" (stub morto) */}
+      <Modal visible={langModal} transparent animationType="fade" onRequestClose={() => setLangModal(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setLangModal(false)}>
+          <Pressable style={styles.modalCard} onPress={() => {}}>
+            <Text style={styles.modalTitle}>{t('st_pick_lang')}</Text>
+            {LANGS.map((l) => (
+              <TouchableOpacity
+                key={l.code}
+                style={[styles.langRow, l.code === lang && styles.langRowActive]}
+                activeOpacity={0.7}
+                onPress={() => { setLang(l.code); setLangModal(false); }}>
+                <Text style={styles.langFlag}>{l.flag}</Text>
+                <Text style={[styles.langName, l.code === lang && { color: COLORS.neon }]}>{l.name}</Text>
+                {l.code === lang && <Ionicons name="checkmark" size={18} color={COLORS.neon} />}
+              </TouchableOpacity>
+            ))}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -149,14 +175,18 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary, fontSize: 11, fontWeight: '700',
     letterSpacing: 1.2, marginBottom: 8, paddingHorizontal: 4,
   },
-  sectionBody: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 12,
-    overflow: 'hidden',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
-  },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 14 },
   label: { color: COLORS.text, fontSize: 14, fontWeight: '500' },
   value: { color: COLORS.textSecondary, fontSize: 12, marginTop: 2 },
   platform: { color: COLORS.textDim, fontSize: 11, textAlign: 'center', marginTop: 24 },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: 28 },
+  modalCard: {
+    width: '100%', backgroundColor: '#0a1020', borderRadius: 18, padding: 18,
+    borderWidth: 1, borderColor: 'rgba(0,170,255,0.2)',
+  },
+  modalTitle: { color: COLORS.text, fontSize: 16, fontWeight: '800', marginBottom: 12, textAlign: 'center' },
+  langRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 10, borderRadius: 10 },
+  langRowActive: { backgroundColor: 'rgba(0,170,255,0.08)' },
+  langFlag: { fontSize: 20 },
+  langName: { color: COLORS.text, fontSize: 14, fontWeight: '600', flex: 1 },
 });
