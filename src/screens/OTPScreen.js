@@ -136,7 +136,9 @@ export default function OTPScreen({ navigation, route }) {
         await setToken(token);
         if (refresh) await SecureStore.setItemAsync('bt_refresh_token', refresh);
         setUser(d.session?.user || d.user);
-        // Navigation vai para SetupPerfil ou Main dependendo do onboarding
+        // Guest-first: fecha o modal de auth e volta pro feed já logado.
+        // MainWithOnboarding detecta o token novo e leva a SetupPerfil se preciso.
+        if (navigation.canGoBack()) navigation.goBack();
       } else {
         // Fallback: backend pode nao ter verify-otp
         // Se foi chamado apos cadastro, login direto com as credenciais do cadastro

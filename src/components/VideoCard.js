@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { useFeedStore, useAuthStore } from '../store';
+import { requireAuth } from '../utils/requireAuth';
 import { COLORS } from '../constants';
 import Avatar from './Avatar';
 import ActionButton from './ActionButton';
@@ -132,6 +133,7 @@ export default function VideoCard({ video, index, cardHeight, activeOverride }) 
   };
 
   const handleLike = async (fromDoubleTap = false) => {
+    if (!requireAuth(nav, 'curtir')) return;
     const wasLiked = liked;
     const nowLiked = !wasLiked;
     if (fromDoubleTap && wasLiked) return;
@@ -145,6 +147,7 @@ export default function VideoCard({ video, index, cardHeight, activeOverride }) 
   };
 
   const handleSave = async () => {
+    if (!requireAuth(nav, 'salvar')) return;
     const nowSaved = !saved;
     setSaved(nowSaved);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -278,7 +281,7 @@ export default function VideoCard({ video, index, cardHeight, activeOverride }) 
           </View>
         </TouchableOpacity>
         <ActionButton icon={liked ? 'heart' : 'heart-outline'} count={likes} onPress={() => handleLike(false)} active={liked} color={COLORS.red} />
-        <ActionButton icon="chatbubble-outline" count={video.comments} onPress={() => nav.navigate('Comentarios', { video_id: video.id })} />
+        <ActionButton icon="chatbubble-outline" count={video.comments} onPress={() => { if (requireAuth(nav, 'comentar')) nav.navigate('Comentarios', { video_id: video.id }); }} />
         <ActionButton icon={saved ? 'bookmark' : 'bookmark-outline'} count={video.saves} onPress={handleSave} active={saved} color={COLORS.neon} />
         <ActionButton icon="paper-plane-outline" onPress={handleShare} />
       </View>

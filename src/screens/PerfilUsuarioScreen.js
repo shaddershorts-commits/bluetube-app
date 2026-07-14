@@ -4,6 +4,7 @@ import {
   Image, useWindowDimensions, Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { requireAuth } from '../utils/requireAuth';
 import { Ionicons } from '@expo/vector-icons';
 import Header from '../components/Header';
 import Avatar from '../components/Avatar';
@@ -62,6 +63,7 @@ export default function PerfilUsuarioScreen({ route }) {
   }, [paramUserId, paramUsername]);
 
   const toggleFollow = useCallback(async () => {
+    if (!requireAuth(nav, 'seguir')) return;
     if (followBusy || !profile?.user_id) return;
     setFollowBusy(true);
     const wasFollowing = isFollowing;
@@ -150,7 +152,7 @@ export default function PerfilUsuarioScreen({ route }) {
 
             <TouchableOpacity
               style={styles.msgBtn}
-              onPress={() => nav.navigate('Conversa', { initNewChat: true, other: profile })}
+              onPress={() => { if (requireAuth(nav, 'conversar')) nav.navigate('Conversa', { initNewChat: true, other: profile }); }}
               activeOpacity={0.85}>
               <Ionicons name="chatbubble-outline" size={18} color={COLORS.text} />
             </TouchableOpacity>

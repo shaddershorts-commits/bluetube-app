@@ -58,12 +58,13 @@ export default function FeedScreen() {
   useEffect(() => () => { if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current); }, []);
 
   useEffect(() => {
-    if (!_popupShownThisSession) {
+    // Popup de boas-vindas só pra usuário logado (guest cai direto no feed limpo)
+    if (user && !_popupShownThisSession) {
       _popupShownThisSession = true;
       const t = setTimeout(() => setShowPopup(true), 600);
       return () => clearTimeout(t);
     }
-  }, []);
+  }, [user]);
 
   const loadFeed = useCallback(async (reset = false) => {
     if (isLoading) return;

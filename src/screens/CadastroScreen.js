@@ -126,6 +126,9 @@ export default function CadastroScreen({ navigation }) {
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
+              autoComplete="email"
+              textContentType="emailAddress"
+              importantForAutofill="yes"
               onFocus={() => setEmailFocus(true)}
               onBlur={() => setEmailFocus(false)}
             />
@@ -143,6 +146,9 @@ export default function CadastroScreen({ navigation }) {
               secureTextEntry={!showPwd}
               autoCapitalize="none"
               autoCorrect={false}
+              autoComplete="new-password"
+              textContentType="newPassword"
+              importantForAutofill="yes"
               onFocus={() => setPwdFocus(true)}
               onBlur={() => setPwdFocus(false)}
             />

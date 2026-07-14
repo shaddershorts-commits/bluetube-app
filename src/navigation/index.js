@@ -8,6 +8,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../store';
+import { isGuest } from '../utils/requireAuth';
 import { COLORS } from '../constants';
 import { colors as theme, blur as blurT } from '../constants/theme';
 import blueAPI from '../api';
@@ -159,9 +160,17 @@ function MainTabs() {
                               return <Ionicons name={name} color={color} size={route.name === 'Camera' ? 30 : 22} />;
 },
                                        })}
-        screenListeners={({ navigation }) => ({
-                  // Double-tap no icone da aba ATIVA recarregava a tela — bloqueia.
-                  tabPress: (e) => { if (navigation.isFocused()) e.preventDefault(); },
+        screenListeners={({ navigation, route }) => ({
+                  tabPress: (e) => {
+                    // Guest tentando Postar/Chat/Perfil → abre login (guest-first).
+                    if (['Camera', 'Chat', 'Perfil'].includes(route.name) && isGuest()) {
+                      e.preventDefault();
+                      navigation.navigate('Login', { reason: route.name === 'Camera' ? 'postar' : route.name === 'Chat' ? 'conversar' : 'perfil' });
+                      return;
+                    }
+                    // Double-tap no icone da aba ATIVA recarregava a tela — bloqueia.
+                    if (navigation.isFocused()) e.preventDefault();
+                  },
         })}>
       <Tab.Screen name="Feed" component={FeedScreen} />
         <Tab.Screen name="Descobrir" component={DiscoverScreen} />
@@ -172,25 +181,28 @@ function MainTabs() {
   );
 }
 
-// Verifica onboarding e redireciona se necessario
+// Verifica onboarding e redireciona se necessario.
+// GUEST-FIRST: so checa onboarding se houver token (guest cai direto no feed).
 function MainWithOnboarding({ navigation }) {
+    const token = useAuthStore((s) => s.token);
     useEffect(() => {
+          if (!token) return; // guest: sem onboarding, vai direto pro feed
           let cancelled = false;
           blueAPI.onboardingStatus().then(d => {
                   if (cancelled) return;
                   // Se backend retornar status incompleto, redirecionar para SetupPerfil
                                                 if (d && (d.status === 'incomplete' || d.onboarding_completed === false)) {
-                                                          navigation.replace('SetupPerfil');
+                                                          navigation.navigate('SetupPerfil');
                                                 }
           }).catch(() => {}); // Silencioso: se falhar, mostra Main normalmente
                   return () => { cancelled = true; };
-    }, []);
+    }, [token]);
 
   return <MainTabs />;
     }
 
 export default function Navigation() {
-    const { token, isLoading, introSeen } = useAuthStore();
+    const { isLoading } = useAuthStore();
     const [splashDone, setSplashDone] = useState(false);
 
   useEffect(() => {
@@ -202,19 +214,18 @@ export default function Navigation() {
         return <SplashScreen onFinish={() => setSplashDone(true)} />;
   }
 
+  // GUEST-FIRST: apos o splash cai direto no feed (Main). Login/Cadastro/OTP
+  // sao MODAIS acionados quando o guest tenta interagir (via requireAuth).
+  // Todas as telas ficam sempre montadas; o gate de login vive nas acoes.
   return (
         <NavigationContainer theme={NAV_THEME} linking={linking}>
-          <Stack.Navigator screenOptions={{ headerShown: false }}>
-{!token ? (
-            <>
-{!introSeen && <Stack.Screen name="Intro" component={IntroScreen} />}
-            <Stack.Screen name="Login" component={LoginScreen} />
-              <Stack.Screen name="Cadastro" component={CadastroScreen} />
-              <Stack.Screen name="OTP" component={OTPScreen} />
-  </>
-         ) : (
-                     <>
+          <Stack.Navigator initialRouteName="Main" screenOptions={{ headerShown: false }}>
                        <Stack.Screen name="Main" component={MainWithOnboarding} />
+                       <Stack.Group screenOptions={{ presentation: 'modal' }}>
+                         <Stack.Screen name="Login" component={LoginScreen} />
+                         <Stack.Screen name="Cadastro" component={CadastroScreen} />
+                         <Stack.Screen name="OTP" component={OTPScreen} />
+                       </Stack.Group>
                        <Stack.Screen name="SetupPerfil" component={SetupPerfilScreen} />
                        <Stack.Screen name="Conversa" component={ConversaScreen} />
                        <Stack.Screen name="PerfilUsuario" component={PerfilUsuarioScreen} />
@@ -230,8 +241,6 @@ export default function Navigation() {
                        <Stack.Screen name="Settings" component={SettingsScreen} />
                        <Stack.Screen name="Video" component={VideoScreen} />
                        <Stack.Screen name="StoryViewer" component={StoryViewerScreen} />
-           </>
-         )}
 </Stack.Navigator>
   </NavigationContainer>
   );

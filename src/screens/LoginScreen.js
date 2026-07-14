@@ -92,6 +92,9 @@ export default function LoginScreen({ navigation, route }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
       }).catch(() => {});
+
+      // Guest-first: login é modal sobre o feed — fecha e volta já logado.
+      if (navigation.canGoBack()) navigation.goBack();
     } catch (e) {
       setError('Erro de conexão');
     }
@@ -120,13 +123,33 @@ export default function LoginScreen({ navigation, route }) {
     }
   };
 
+  // Mensagem contextual quando o guest é levado ao login por uma interação
+  const REASONS = {
+    curtir: 'Entre na sua conta para curtir vídeos',
+    comentar: 'Entre na sua conta para comentar',
+    salvar: 'Entre na sua conta para salvar vídeos',
+    seguir: 'Entre na sua conta para seguir criadores',
+    postar: 'Entre na sua conta para postar seus vídeos',
+    conversar: 'Entre na sua conta para conversar',
+    perfil: 'Entre para acessar seu perfil',
+  };
+  const reasonMsg = REASONS[route?.params?.reason] || null;
+
   return (
     <LinearGradient colors={[COLORS.background, COLORS.surface]} style={{ flex: 1 }}>
       <StatusBar style="light" />
+      {navigation.canGoBack() && (
+        <TouchableOpacity
+          style={styles.closeBtn}
+          onPress={() => navigation.goBack()}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+          <Ionicons name="close" size={26} color={COLORS.text} />
+        </TouchableOpacity>
+      )}
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.container}>
         <View style={styles.logoWrap}>
           <LogoBlueTube width={220} height={110} variant="stacked" />
-          <Text style={styles.sub}>A nova rede social de vídeos do Brasil</Text>
+          <Text style={styles.sub}>{reasonMsg || 'A nova rede social de vídeos curtos'}</Text>
         </View>
 
         <View style={styles.tabs}>
@@ -168,8 +191,8 @@ export default function LoginScreen({ navigation, route }) {
             secureTextEntry={!showPwd}
             autoCapitalize="none"
             autoCorrect={false}
-            autoComplete="password"
-            textContentType="password"
+            autoComplete={mode === 'signup' ? 'new-password' : 'password'}
+            textContentType={mode === 'signup' ? 'newPassword' : 'password'}
             importantForAutofill="yes"
             onFocus={() => setPwdFocus(true)}
             onBlur={() => setPwdFocus(false)}
@@ -202,6 +225,7 @@ export default function LoginScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 24, justifyContent: 'center' },
+  closeBtn: { position: 'absolute', top: 48, right: 20, zIndex: 10, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center' },
   logoWrap: { alignItems: 'center', marginBottom: 36 },
   sub: { color: COLORS.textSecondary, fontSize: 13, textAlign: 'center', marginTop: 10 },
   tabs: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: 4, marginBottom: 22 },
