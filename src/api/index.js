@@ -161,12 +161,22 @@ export const blueAPI = {
     },
 
     // Comentarios
-    comentarios: (video_id) => api(`blue-comment?video_id=${video_id}&limit=50`),
-    // FIX 2026-07-14: backend espera campo `text` — mandavamos `content` e o
-    // comentario era rejeitado silenciosamente (400) e "sumia" no reload.
-    comentar: async (video_id, texto) => {
+    // token no GET → traz liked_by_me por comentário
+    comentarios: async (video_id) => {
           const token = await getToken();
-          return api('blue-comment', { method: 'POST', body: JSON.stringify({ video_id, text: texto, token }) });
+          const tk = token ? `&token=${encodeURIComponent(token)}` : '';
+          return api(`blue-comment?video_id=${video_id}&limit=200${tk}`);
+    },
+    // FIX 2026-07-14: backend espera campo `text` (nao `content`).
+    // parent_id opcional = resposta a outro comentario.
+    comentar: async (video_id, texto, parent_id) => {
+          const token = await getToken();
+          return api('blue-comment', { method: 'POST', body: JSON.stringify({ video_id, text: texto, token, parent_id: parent_id || null }) });
+    },
+    // Curtir/descurtir um comentario (toggle) → { liked, likes }
+    curtirComentario: async (comment_id) => {
+          const token = await getToken();
+          return api('blue-comment', { method: 'POST', body: JSON.stringify({ action: 'like', comment_id, token }) });
     },
 
     // Chat
