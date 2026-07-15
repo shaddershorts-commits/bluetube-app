@@ -1,74 +1,236 @@
+// Chat estilo WhatsApp: abas Conversas / Status / Chamadas + menu ⋮,
+// barra de busca por nome, conversas 1:1 + grupos na mesma lista,
+// FAB de novo grupo. Status = stories (mesmo backend do feed).
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
+import {
+  View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator,
+  RefreshControl, TextInput, Modal, Pressable,
+} from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import Header from '../components/Header';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Avatar from '../components/Avatar';
 import blueAPI from '../api';
 import { COLORS } from '../constants';
 
+function fmtHora(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const hoje = new Date();
+  if (d.toDateString() === hoje.toDateString()) {
+    return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  }
+  const ontem = new Date(hoje.getTime() - 86400000);
+  if (d.toDateString() === ontem.toDateString()) return 'ontem';
+  return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
 export default function ChatScreen() {
   const nav = useNavigation();
+  const insets = useSafeAreaInsets();
+  const [tab, setTab] = useState('conversas'); // conversas | status | chamadas
+  const [busca, setBusca] = useState('');
   const [conversas, setConversas] = useState([]);
+  const [grupos, setGrupos] = useState([]);
+  const [statusGroups, setStatusGroups] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const d = await blueAPI.conversas();
-      setConversas(d.conversations || d.conversas || []);
-    } catch {}
+      const [c, g, s] = await Promise.all([
+        blueAPI.conversas().catch(() => null),
+        blueAPI.meusGrupos().catch(() => null),
+        blueAPI.storiesFeed().catch(() => null),
+      ]);
+      setConversas(c?.conversations || []);
+      setGrupos(g?.grupos || []);
+      setStatusGroups((s?.users || []).filter((u) => Array.isArray(u.stories) && u.stories.length > 0));
+    } catch (_) {}
     setLoading(false);
   }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
+  // Lista unificada: 1:1 + grupos, ordenada por última mensagem
+  const itens = [
+    ...conversas.map((c) => ({ tipo: '1a1', id: 'c_' + c.id, nome: (c.other?.display_name || c.other?.username || 'Usuário'), sub: c.last_message || 'Sem mensagens', quando: c.last_message_at, unread: c.unread || 0, raw: c })),
+    ...grupos.map((g) => ({ tipo: 'grupo', id: 'g_' + g.id, nome: g.nome, sub: g.last_message || (g.descricao || 'Grupo'), quando: g.last_message_at || g.created_at, unread: 0, raw: g })),
+  ]
+    .filter((i) => !busca.trim() || i.nome.toLowerCase().includes(busca.trim().toLowerCase()))
+    .sort((a, b) => new Date(b.quando || 0) - new Date(a.quando || 0));
+
+  const abrir = (item) => {
+    if (item.tipo === 'grupo') nav.navigate('Conversa', { grupo: item.raw });
+    else nav.navigate('Conversa', { conversation_id: item.raw.id, other: item.raw.other });
+  };
+
+  const renderConversa = ({ item }) => (
+    <TouchableOpacity style={styles.item} onPress={() => abrir(item)}>
+      {item.tipo === 'grupo'
+        ? <View style={styles.groupAv}><Ionicons name="people" size={22} color={COLORS.neon} /></View>
+        : <Avatar uri={item.raw.other?.avatar_url} initial={item.nome} size={50} />}
+      <View style={styles.info}>
+        <Text style={styles.name} numberOfLines={1}>{item.nome}</Text>
+        <Text style={styles.last} numberOfLines={1}>{item.sub}</Text>
+      </View>
+      <View style={styles.meta}>
+        <Text style={[styles.hora, item.unread > 0 && { color: COLORS.neon }]}>{fmtHora(item.quando)}</Text>
+        {item.unread > 0 && <View style={styles.badge}><Text style={styles.badgeText}>{item.unread}</Text></View>}
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderStatus = ({ item }) => {
+    const vistos = item.stories.every((s) => s.visto);
+    return (
+      <TouchableOpacity
+        style={styles.item}
+        onPress={() => nav.navigate('StoryViewer', { users: statusGroups, startUserIndex: statusGroups.indexOf(item) })}>
+        <View style={[styles.statusRing, !vistos && { borderColor: COLORS.neon }]}>
+          <Avatar uri={item.avatar_url} initial={item.display_name || item.username} size={48} />
+        </View>
+        <View style={styles.info}>
+          <Text style={styles.name}>@{item.username}</Text>
+          <Text style={styles.last}>{item.stories.length} {item.stories.length === 1 ? 'status' : 'status'} · {fmtHora(item.stories[item.stories.length - 1]?.created_at)}</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   return (
-    <View style={{ flex: 1, backgroundColor: COLORS.background }}>
-      <Header title="Mensagens" />
+    <View style={{ flex: 1, backgroundColor: COLORS.background, paddingTop: insets.top }}>
+      {/* Header: título + ⋮ */}
+      <View style={styles.topbar}>
+        <Text style={styles.title}>Chat</Text>
+        <TouchableOpacity onPress={() => setMenuOpen(true)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Ionicons name="ellipsis-vertical" size={22} color={COLORS.text} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Abas estilo WhatsApp */}
+      <View style={styles.tabs}>
+        {[['conversas', 'Conversas'], ['status', 'Status'], ['chamadas', 'Chamadas']].map(([key, label]) => (
+          <TouchableOpacity key={key} style={[styles.tabBtn, tab === key && styles.tabBtnActive]} onPress={() => setTab(key)}>
+            <Text style={[styles.tabText, tab === key && styles.tabTextActive]}>{label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Busca */}
+      {tab === 'conversas' && (
+        <View style={styles.searchWrap}>
+          <Ionicons name="search" size={16} color={COLORS.textDim} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Buscar conversa…"
+            placeholderTextColor={COLORS.textDim}
+            value={busca}
+            onChangeText={setBusca}
+          />
+          {busca ? (
+            <TouchableOpacity onPress={() => setBusca('')}><Ionicons name="close-circle" size={16} color={COLORS.textDim} /></TouchableOpacity>
+          ) : null}
+        </View>
+      )}
+
       {loading ? (
         <ActivityIndicator color={COLORS.neon} style={{ marginTop: 40 }} />
-      ) : !conversas.length ? (
-        <View style={styles.empty}>
-          <Text style={styles.emptyIcon}>💬</Text>
-          <Text style={styles.emptyText}>Nenhuma conversa ainda</Text>
-          <Text style={styles.emptySub}>Envie uma mensagem para alguém pelo perfil</Text>
-        </View>
+      ) : tab === 'conversas' ? (
+        itens.length === 0 ? (
+          <View style={styles.empty}>
+            <Text style={styles.emptyIcon}>💬</Text>
+            <Text style={styles.emptyText}>{busca ? 'Nenhuma conversa encontrada' : 'Nenhuma conversa ainda'}</Text>
+            <Text style={styles.emptySub}>{busca ? 'Tenta outro nome' : 'Envie uma mensagem pelo perfil de alguém'}</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={itens}
+            keyExtractor={(i) => i.id}
+            refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor={COLORS.neon} />}
+            renderItem={renderConversa}
+            contentContainerStyle={{ paddingBottom: 140 }}
+          />
+        )
+      ) : tab === 'status' ? (
+        statusGroups.length === 0 ? (
+          <View style={styles.empty}>
+            <Text style={styles.emptyIcon}>📸</Text>
+            <Text style={styles.emptyText}>Nenhum status agora</Text>
+            <Text style={styles.emptySub}>Os stories de quem você segue aparecem aqui</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={statusGroups}
+            keyExtractor={(i) => i.user_id}
+            refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor={COLORS.neon} />}
+            renderItem={renderStatus}
+            contentContainerStyle={{ paddingBottom: 140 }}
+          />
+        )
       ) : (
-        <FlatList
-          data={conversas}
-          keyExtractor={(item) => String(item.id)}
-          refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor={COLORS.neon} />}
-          renderItem={({ item }) => {
-            const o = item.other || item.outro || {};
-            return (
-              <TouchableOpacity style={styles.item} onPress={() => nav.navigate('Conversa', { conversation_id: item.id, other: o })}>
-                <Avatar uri={o.avatar_url} initial={o.display_name || o.username} size={50} />
-                <View style={styles.info}>
-                  <Text style={styles.name}>{o.display_name || o.username || 'Usuário'}</Text>
-                  <Text style={styles.last} numberOfLines={1}>{item.last_message || 'Sem mensagens'}</Text>
-                </View>
-                {item.unread > 0 && (
-                  <View style={styles.badge}>
-                    <Text style={styles.badgeText}>{item.unread}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            );
-          }}
-        />
+        <View style={styles.empty}>
+          <Text style={styles.emptyIcon}>📞</Text>
+          <Text style={styles.emptyText}>Chamadas em breve</Text>
+          <Text style={styles.emptySub}>Ligações de voz e vídeo estão chegando</Text>
+        </View>
       )}
+
+      {/* FAB novo grupo */}
+      {tab === 'conversas' && (
+        <TouchableOpacity style={styles.fab} onPress={() => nav.navigate('CriarGrupo')}>
+          <Ionicons name="people" size={22} color="#fff" />
+          <Ionicons name="add" size={14} color="#fff" style={styles.fabPlus} />
+        </TouchableOpacity>
+      )}
+
+      {/* Menu ⋮ */}
+      <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
+        <Pressable style={styles.menuBackdrop} onPress={() => setMenuOpen(false)}>
+          <View style={[styles.menuCard, { top: insets.top + 44 }]}>
+            <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuOpen(false); nav.navigate('CriarGrupo'); }}>
+              <Text style={styles.menuText}>Novo grupo</Text>
+            </TouchableOpacity>
+            <View style={styles.menuDivider} />
+            <View style={styles.menuItem}>
+              <Text style={[styles.menuText, { color: COLORS.textDim }]}>Mais opções em breve…</Text>
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  topbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10 },
+  title: { color: COLORS.text, fontSize: 20, fontWeight: '800' },
+  tabs: { flexDirection: 'row', paddingHorizontal: 10, gap: 6, marginBottom: 8 },
+  tabBtn: { flex: 1, paddingVertical: 8, borderRadius: 100, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.04)' },
+  tabBtnActive: { backgroundColor: 'rgba(0,170,255,0.15)' },
+  tabText: { color: COLORS.textSecondary, fontSize: 13, fontWeight: '600' },
+  tabTextActive: { color: COLORS.neon, fontWeight: '800' },
+  searchWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: COLORS.surface, borderRadius: 12, marginHorizontal: 12, marginBottom: 6, paddingHorizontal: 12 },
+  searchInput: { flex: 1, paddingVertical: 9, color: COLORS.text, fontSize: 13 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40, gap: 8 },
   emptyIcon: { fontSize: 48 },
   emptyText: { color: COLORS.text, fontSize: 15, fontWeight: '600' },
-  emptySub: { color: COLORS.textSecondary, fontSize: 12 },
-  item: { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 12, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  emptySub: { color: COLORS.textSecondary, fontSize: 12, textAlign: 'center' },
+  item: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, gap: 12, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  groupAv: { width: 50, height: 50, borderRadius: 25, backgroundColor: 'rgba(0,170,255,0.12)', alignItems: 'center', justifyContent: 'center' },
+  statusRing: { padding: 2, borderRadius: 28, borderWidth: 2, borderColor: 'rgba(255,255,255,0.2)' },
   info: { flex: 1 },
   name: { color: COLORS.text, fontSize: 14, fontWeight: '700', marginBottom: 2 },
   last: { color: COLORS.textSecondary, fontSize: 12 },
+  meta: { alignItems: 'flex-end', gap: 4 },
+  hora: { color: COLORS.textDim, fontSize: 11 },
   badge: { backgroundColor: COLORS.neon, borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
   badgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  fab: { position: 'absolute', right: 18, bottom: 96, width: 54, height: 54, borderRadius: 27, backgroundColor: COLORS.neon, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
+  fabPlus: { position: 'absolute', top: 10, right: 10 },
+  menuBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' },
+  menuCard: { position: 'absolute', right: 12, backgroundColor: '#0a1020', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(0,170,255,0.2)', minWidth: 190, overflow: 'hidden' },
+  menuItem: { paddingHorizontal: 16, paddingVertical: 13 },
+  menuText: { color: COLORS.text, fontSize: 14 },
+  menuDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.06)' },
 });

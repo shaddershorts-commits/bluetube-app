@@ -37,6 +37,7 @@ import MonetizacaoScreen from '../screens/MonetizacaoScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import VideoScreen from '../screens/VideoScreen';
 import StoryViewerScreen from '../screens/StoryViewerScreen';
+import CriarGrupoScreen from '../screens/CriarGrupoScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -241,6 +242,7 @@ export default function Navigation() {
                        <Stack.Screen name="Settings" component={SettingsScreen} />
                        <Stack.Screen name="Video" component={VideoScreen} />
                        <Stack.Screen name="StoryViewer" component={StoryViewerScreen} />
+                       <Stack.Screen name="CriarGrupo" component={CriarGrupoScreen} />
 </Stack.Navigator>
   </NavigationContainer>
   );

@@ -189,11 +189,78 @@ export const blueAPI = {
           const token = await getToken();
           return api(`blue-chat?action=messages&conv_id=${conversation_id}&token=${encodeURIComponent(token)}`);
     },
-    enviarMensagem: async (conversation_id, content, receiver_id) => {
+    enviarMensagem: async (conversation_id, content, receiver_id, media) => {
           // Backend espera `to_user_id` + `text` (nao `receiver_id` + `content`).
           // O `conversation_id` nao eh enviado — backend deriva do par sorted.
+          // media opcional: { url, type: 'image'|'video'|'audio'|'gif', duration }
           const token = await getToken();
-          return api('blue-chat', { method: 'POST', body: JSON.stringify({ action: 'send', to_user_id: receiver_id, text: content, token }) });
+          return api('blue-chat', { method: 'POST', body: JSON.stringify({
+                action: 'send', to_user_id: receiver_id, text: content || '', token,
+                ...(media?.url ? { media_url: media.url, media_type: media.type, media_duration: media.duration || null } : {}),
+          }) });
+    },
+    // Upload de midia do chat pro bucket blue-videos. Path começa com o
+    // userId (mesma convenção do upload de vídeo, que a policy do bucket
+    // já aceita) — sub extraído do próprio JWT.
+    uploadChatMedia: async (localUri, { ext = 'jpg', mime = 'image/jpeg' } = {}) => {
+          const token = await getToken();
+          if (!token) return { error: 'Login necessario' };
+          try {
+                let sub = 'anon';
+                try { sub = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).sub || 'anon'; } catch (_) {}
+                const pathStorage = sub + '/chat/' + Date.now() + '.' + ext;
+                const url = `${SUPABASE_URL}/storage/v1/object/blue-videos/${pathStorage}`;
+                const up = await FileSystem.uploadAsync(url, localUri, {
+                      httpMethod: 'POST',
+                      uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+                      headers: {
+                            apikey: SUPABASE_ANON_KEY,
+                            Authorization: 'Bearer ' + token,
+                            'Content-Type': mime,
+                            'x-upsert': 'true',
+                      },
+                });
+                if (up.status >= 400) return { error: 'Falha no upload (HTTP ' + up.status + ')' };
+                return { url: `${SUPABASE_URL}/storage/v1/object/public/blue-videos/${pathStorage}` };
+          } catch (e) { return { error: e.message || 'Falha no upload' }; }
+    },
+    // Presenca (online / visto por ultimo) + heartbeat
+    presenca: async (user_id) => {
+          const token = await getToken();
+          return api(`blue-chat?action=presence&user_id=${encodeURIComponent(user_id)}&token=${encodeURIComponent(token)}`);
+    },
+    chatStatus: async (status) => {
+          const token = await getToken();
+          if (!token) return { ok: false };
+          return api('blue-chat', { method: 'POST', body: JSON.stringify({ action: 'status', status, token }) });
+    },
+    // ── GRUPOS (chat em grupo estilo WhatsApp) ────────────────────────────
+    meusGrupos: async () => {
+          const token = await getToken();
+          return api(`blue-grupos?action=listar&token=${encodeURIComponent(token)}`);
+    },
+    criarGrupo: async (nome, membros) => {
+          const token = await getToken();
+          return api('blue-grupos', { method: 'POST', body: JSON.stringify({ action: 'criar', token, nome, tipo: 'privado', membros: membros || [] }) });
+    },
+    grupoMensagens: async (grupo_id) => {
+          const token = await getToken();
+          return api(`blue-grupos?action=mensagens&grupo_id=${encodeURIComponent(grupo_id)}&token=${encodeURIComponent(token)}`);
+    },
+    grupoEnviar: async (grupo_id, mensagem, media) => {
+          const token = await getToken();
+          return api('blue-grupos', { method: 'POST', body: JSON.stringify({
+                action: 'mensagem', token, grupo_id, mensagem: mensagem || '',
+                ...(media?.url ? { media_url: media.url, media_type: media.type, media_duration: media.duration || null } : {}),
+          }) });
+    },
+    grupoMembros: async (grupo_id) => {
+          const token = await getToken();
+          return api(`blue-grupos?action=membros&grupo_id=${encodeURIComponent(grupo_id)}&token=${encodeURIComponent(token)}`);
+    },
+    grupoAdicionar: async (grupo_id, user_id) => {
+          const token = await getToken();
+          return api('blue-grupos', { method: 'POST', body: JSON.stringify({ action: 'adicionar', token, grupo_id, user_id }) });
     },
     abrirConversa: async (with_user_id) => {
           // Cria-ou-pega conversa com outro user; retorna { conv_id, other }.

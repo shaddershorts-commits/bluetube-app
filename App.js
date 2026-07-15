@@ -26,10 +26,21 @@ function App() {
       NavigationBar.setButtonStyleAsync('light').catch(() => {});
     }
     // Pausa videos quando o app vai pro background (Android continuava tocando audio)
+    // + presença do chat (online / visto por último): heartbeat a cada 60s em
+    // foreground, 'offline' ao ir pro background. Fail-soft (sem token = no-op).
+    const blueAPI = require('./src/api').default;
+    const beat = (status) => {
+      if (useAuthStore.getState().token) blueAPI.chatStatus(status).catch(() => {});
+    };
+    beat('online');
+    const hb = setInterval(() => {
+      if (AppState.currentState === 'active') beat('online');
+    }, 60000);
     const sub = AppState.addEventListener('change', (st) => {
       useFeedStore.getState().setAppActive(st === 'active');
+      beat(st === 'active' ? 'online' : 'offline');
     });
-    return () => sub.remove();
+    return () => { sub.remove(); clearInterval(hb); };
   }, []);
 
   useEffect(() => {
