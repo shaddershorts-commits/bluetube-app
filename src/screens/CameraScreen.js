@@ -4,7 +4,6 @@ import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import * as MediaLibrary from 'expo-media-library';
 import * as ImagePicker from 'expo-image-picker';
 import { COLORS } from '../constants';
 
@@ -41,9 +40,8 @@ export default function CameraScreen() {
   // Publicar video ja existente da galeria (nao so gravar na hora)
   const pickFromGallery = async () => {
     try {
-      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!perm.granted) { Alert.alert('Permissão', 'Libera o acesso à galeria pra escolher um vídeo.'); return; }
-      const res = await ImagePicker.launchImageLibraryAsync({
+      // Photo Picker do sistema (Android 13+/backport) — sem permissão de galeria
+            const res = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Videos,
         quality: 1,
         videoMaxDuration: 60,
@@ -58,11 +56,8 @@ export default function CameraScreen() {
   const saveAndPublish = async () => {
     if (!videoUri) return;
     setSaving(true);
-    // Salvar na galeria é opcional — publicação é o fluxo principal
-    try {
-      const perm = await MediaLibrary.requestPermissionsAsync();
-      if (perm.granted) MediaLibrary.saveToLibraryAsync(videoUri).catch(() => {});
-    } catch (e) {}
+    // Cópia na galeria removida: exigia READ_MEDIA_* (política Photo & Video
+    // Permissions do Play). O vídeo segue direto pra publicação.
     setSaving(false);
     const uri = videoUri;
     setVideoUri(null);

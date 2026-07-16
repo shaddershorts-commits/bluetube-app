@@ -184,8 +184,7 @@ export default function ConversaScreen({ route }) {
   // Foto/vídeo/GIF da galeria
   const anexar = async () => {
     try {
-      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!perm.granted) { Alert.alert('Permissão', 'Libera o acesso à galeria.'); return; }
+      // Photo Picker do sistema — sem permissão de galeria
       const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.All, quality: 0.8, videoMaxDuration: 60 });
       if (res.canceled || !res.assets?.length) return;
       const a = res.assets[0];

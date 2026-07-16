@@ -42,12 +42,18 @@ export default {
                             backgroundColor: '#020817',
                   },
                   package: 'com.bluetube.app',
+                  // Permissões mínimas (política Play 2025/26): foto/vídeo via
+                  // Photo Picker do sistema (SEM READ_MEDIA_*); storage legacy fora.
                   permissions: [
                             'CAMERA',
                             'RECORD_AUDIO',
-                            'READ_EXTERNAL_STORAGE',
-                            'WRITE_EXTERNAL_STORAGE',
                             'VIBRATE',
+                          ],
+                  blockedPermissions: [
+                            'android.permission.READ_MEDIA_IMAGES',
+                            'android.permission.READ_MEDIA_VIDEO',
+                            'android.permission.READ_EXTERNAL_STORAGE',
+                            'android.permission.WRITE_EXTERNAL_STORAGE',
                           ],
                   // Deep links: captura https://bluetubeviral.com/blue/* e bluetube://
                   // autoVerify: true exige assetlinks.json em /.well-known/assetlinks.json
@@ -74,8 +80,15 @@ export default {
           // o gradle no upload de sourcemaps. O SDK JS (@sentry/react-native)
           // continua capturando erros em runtime normalmente.
           plugins: [
+                  // targetSdk 35 = exigência Google Play pra apps novos (ago/2025+).
+                  // Expo SDK 52 default é 34 — sem isso o upload do AAB é rejeitado.
+                  ['expo-build-properties', {
+                            android: { compileSdkVersion: 35, targetSdkVersion: 35 },
+                  }],
                   'expo-camera',
-                  'expo-media-library',
+                  // expo-media-library REMOVIDO (política Photo & Video Permissions):
+                  // adicionava READ_MEDIA_IMAGES/VIDEO ao manifest. Seleção de mídia
+                  // usa o Photo Picker do sistema (expo-image-picker, sem permissão).
                   'expo-notifications',
                   'expo-av',
                 ],

@@ -49,11 +49,7 @@ export default function EditProfileScreen() {
   }, []);
 
   const pickAvatar = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert('Permissão necessária', 'Libera o acesso às fotos pra poder mudar teu avatar.');
-      return;
-    }
+    // Photo Picker do sistema — sem permissão de galeria
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
