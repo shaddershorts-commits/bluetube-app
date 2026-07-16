@@ -10,6 +10,7 @@ import * as FileSystem from 'expo-file-system';
 import { useNavigation } from '@react-navigation/native';
 import Avatar from '../components/Avatar';
 import blueAPI from '../api';
+import { useAuthStore } from '../store';
 import { COLORS } from '../constants';
 
 const MAX_NAME = 50;
@@ -24,6 +25,39 @@ export default function EditProfileScreen() {
   const nav = useNavigation();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  // Exclusão de conta (Google Play): dupla confirmação, aviso conta única
+  const confirmarExclusao = () => {
+    Alert.alert(
+      'Excluir sua conta?',
+      'Sua conta é ÚNICA para o app e o site bluetubeviral.com. Excluir apaga permanentemente: perfil, vídeos, comentários, mensagens e curtidas. Isso NÃO pode ser desfeito.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Continuar', style: 'destructive',
+          onPress: () => Alert.alert('Última confirmação', 'Excluir tudo agora, de forma definitiva?', [
+            { text: 'Voltar', style: 'cancel' },
+            { text: 'EXCLUIR MINHA CONTA', style: 'destructive', onPress: executarExclusao },
+          ]),
+        },
+      ],
+    );
+  };
+
+  const executarExclusao = async () => {
+    setDeleting(true);
+    const r = await blueAPI.deleteAccount().catch((e) => ({ error: e.message }));
+    setDeleting(false);
+    if (r?.active_subscription) {
+      Alert.alert('Assinatura ativa', 'Cancele sua assinatura primeiro (no site: Perfil → Gerenciar assinatura) e depois volte aqui pra excluir a conta.');
+      return;
+    }
+    if (r?.error) { Alert.alert('Não foi possível excluir', r.error); return; }
+    await useAuthStore.getState().logout();
+    Alert.alert('Conta excluída', 'Sua conta e seus dados foram removidos. Até logo! 👋');
+    nav.reset({ index: 0, routes: [{ name: 'Main' }] });
+  };
   const [original, setOriginal] = useState(null);
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
@@ -202,8 +236,21 @@ export default function EditProfileScreen() {
         />
 
         <Text style={styles.footer}>
-          Quer mudar email, senha ou deletar a conta? Por enquanto use o site em bluetubeviral.com/blue.
+          Quer mudar email ou senha? Use o site em bluetubeviral.com.
         </Text>
+
+        {/* Zona de perigo — exclusão de conta (exigência Google Play) */}
+        <View style={styles.dangerZone}>
+          <Text style={styles.dangerTitle}>ZONA DE PERIGO</Text>
+          <TouchableOpacity style={styles.deleteBtn} onPress={confirmarExclusao} disabled={deleting}>
+            {deleting
+              ? <ActivityIndicator color="#f87171" size="small" />
+              : <Text style={styles.deleteText}>🗑️ Excluir conta permanentemente</Text>}
+          </TouchableOpacity>
+          <Text style={styles.dangerHint}>
+            Apaga sua conta BlueTube inteira (app e site): vídeos, comentários, mensagens e perfil. Irreversível.
+          </Text>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -281,6 +328,11 @@ const styles = StyleSheet.create({
   fieldFoot: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   helper: { color: COLORS.textDim, fontSize: 11, flex: 1 },
   counter: { color: COLORS.textDim, fontSize: 11 },
+  dangerZone: { marginTop: 28, borderTopWidth: 1, borderTopColor: 'rgba(248,113,113,0.2)', paddingTop: 18 },
+  dangerTitle: { color: '#f87171', fontSize: 11, fontWeight: '800', letterSpacing: 1.5, marginBottom: 12, textAlign: 'center' },
+  deleteBtn: { borderWidth: 1, borderColor: 'rgba(248,113,113,0.45)', borderRadius: 12, paddingVertical: 13, alignItems: 'center', backgroundColor: 'rgba(248,113,113,0.06)' },
+  deleteText: { color: '#f87171', fontSize: 14, fontWeight: '700' },
+  dangerHint: { color: COLORS.textDim, fontSize: 11, textAlign: 'center', marginTop: 10, lineHeight: 16 },
   footer: {
     color: COLORS.textDim,
     fontSize: 12,
