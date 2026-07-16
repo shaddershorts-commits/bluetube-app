@@ -42,6 +42,9 @@ export default {
                             backgroundColor: '#020817',
                   },
                   package: 'com.bluetube.app',
+                  // versionCode manual (autoIncrement não suporta app.config.js dinâmico).
+                  // Regra: +1 a cada AAB enviado pra loja. 1.5.0 → 150.
+                  versionCode: 150,
                   // Permissões mínimas (política Play 2025/26): foto/vídeo via
                   // Photo Picker do sistema (SEM READ_MEDIA_*); storage legacy fora.
                   permissions: [
