@@ -25,39 +25,6 @@ export default function EditProfileScreen() {
   const nav = useNavigation();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-
-  // Exclusão de conta (Google Play): dupla confirmação, aviso conta única
-  const confirmarExclusao = () => {
-    Alert.alert(
-      'Excluir sua conta?',
-      'Sua conta é ÚNICA para o app e o site bluetubeviral.com. Excluir apaga permanentemente: perfil, vídeos, comentários, mensagens e curtidas. Isso NÃO pode ser desfeito.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Continuar', style: 'destructive',
-          onPress: () => Alert.alert('Última confirmação', 'Excluir tudo agora, de forma definitiva?', [
-            { text: 'Voltar', style: 'cancel' },
-            { text: 'EXCLUIR MINHA CONTA', style: 'destructive', onPress: executarExclusao },
-          ]),
-        },
-      ],
-    );
-  };
-
-  const executarExclusao = async () => {
-    setDeleting(true);
-    const r = await blueAPI.deleteAccount().catch((e) => ({ error: e.message }));
-    setDeleting(false);
-    if (r?.active_subscription) {
-      Alert.alert('Assinatura ativa', 'Cancele sua assinatura primeiro (no site: Perfil → Gerenciar assinatura) e depois volte aqui pra excluir a conta.');
-      return;
-    }
-    if (r?.error) { Alert.alert('Não foi possível excluir', r.error); return; }
-    await useAuthStore.getState().logout();
-    Alert.alert('Conta excluída', 'Sua conta e seus dados foram removidos. Até logo! 👋');
-    nav.reset({ index: 0, routes: [{ name: 'Main' }] });
-  };
   const [original, setOriginal] = useState(null);
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
@@ -236,21 +203,9 @@ export default function EditProfileScreen() {
         />
 
         <Text style={styles.footer}>
-          Quer mudar email ou senha? Use o site em bluetubeviral.com.
+          Quer mudar a senha ou excluir a conta? Fica em Configurações ⚙️
         </Text>
 
-        {/* Zona de perigo — exclusão de conta (exigência Google Play) */}
-        <View style={styles.dangerZone}>
-          <Text style={styles.dangerTitle}>ZONA DE PERIGO</Text>
-          <TouchableOpacity style={styles.deleteBtn} onPress={confirmarExclusao} disabled={deleting}>
-            {deleting
-              ? <ActivityIndicator color="#f87171" size="small" />
-              : <Text style={styles.deleteText}>🗑️ Excluir conta permanentemente</Text>}
-          </TouchableOpacity>
-          <Text style={styles.dangerHint}>
-            Apaga sua conta BlueTube inteira (app e site): vídeos, comentários, mensagens e perfil. Irreversível.
-          </Text>
-        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );

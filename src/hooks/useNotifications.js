@@ -25,10 +25,45 @@ export function useNotifications() {
   }, []);
 }
 
-async function register() {
+// Exportados pro toggle das Configurações
+export async function registerPush() {
+  await SecureStore.deleteItemAsync('bt_push_off').catch(() => {});
+  return register(true);
+}
+
+export async function unregisterPush() {
+  await SecureStore.setItemAsync('bt_push_off', '1').catch(() => {});
   try {
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId || Constants.easConfig?.projectId;
+    const tokenResp = await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined).catch(() => null);
+    const expoPushToken = tokenResp?.data;
+    const userToken = await SecureStore.getItemAsync('bt_token');
+    if (!expoPushToken || !userToken) return true;
+    await fetch(`${API_BASE}/push-register`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: userToken, expo_push_token: expoPushToken }),
+    });
+  } catch {}
+  return true;
+}
+
+export async function isPushEnabled() {
+  const off = await SecureStore.getItemAsync('bt_push_off').catch(() => null);
+  if (off === '1') return false;
+  const { status } = await Notifications.getPermissionsAsync().catch(() => ({ status: 'undetermined' }));
+  return status === 'granted';
+}
+
+async function register(force = false) {
+  try {
+    // Preferência do usuário (toggle nas Configurações)
+    if (!force) {
+      const off = await SecureStore.getItemAsync('bt_push_off').catch(() => null);
+      if (off === '1') return;
+    }
     const { status } = await Notifications.requestPermissionsAsync();
-    if (status !== 'granted') return;
+    if (status !== 'granted') return false;
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('default', {
         name: 'BlueTube',
@@ -59,5 +94,6 @@ async function register() {
         platform: Platform.OS,
       }),
     });
-  } catch {}
+    return true;
+  } catch { return false; }
 }

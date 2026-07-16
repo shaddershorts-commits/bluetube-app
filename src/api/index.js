@@ -57,6 +57,13 @@ async function api(endpoint, options = {}) {
 }
 
 export const blueAPI = {
+    // Conta: código por email + troca de senha (Settings)
+    sendOtp: (email) => api("auth", { method: "POST", body: JSON.stringify({ action: "send_otp", email }) }),
+    changePassword: async (otp, new_password) => {
+        const token = await getToken();
+        return api("blue-account", { method: "POST", body: JSON.stringify({ action: "change-password", token, otp, new_password }) });
+    },
+
     // Chat v3: fixar/apagar conversa, contatos, msg delete/edit, share
     convPin: async (conv_id) => {
         const token = await getToken();
