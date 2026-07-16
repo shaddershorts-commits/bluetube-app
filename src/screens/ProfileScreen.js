@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Constants from 'expo-constants';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import Avatar from '../components/Avatar';
@@ -229,6 +230,8 @@ export default function ProfileScreen() {
             ))
           )}
         </View>
+        {/* Versão do app — também serve de marcador visível de update OTA */}
+        <Text style={styles.appVersion}>Blue v{Constants.expoConfig?.version || '1.5.0'}</Text>
       </ScrollView>
 
       {/* Menu hamburger (bottom sheet) — Liquid Glass */}
@@ -302,6 +305,10 @@ function MenuItem({ icon, label, onPress, color }) {
 }
 
 const styles = StyleSheet.create({
+  appVersion: {
+    textAlign: 'center', color: 'rgba(140,165,195,0.45)', fontSize: 11,
+    paddingVertical: 18, letterSpacing: 0.5,
+  },
   storyPlus: {
     position: 'absolute', bottom: 0, right: -2, width: 28, height: 28, borderRadius: 14,
     backgroundColor: COLORS.neon, alignItems: 'center', justifyContent: 'center',
