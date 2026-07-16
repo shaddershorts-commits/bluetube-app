@@ -2,7 +2,10 @@ export default {
     expo: {
           name: 'BlueTube',
           slug: 'bluetube',
-          version: '1.5.0',
+          version: '1.5.1',
+          // SDK 53 liga a nova arquitetura por padrão; mantida DESLIGADA no
+          // lançamento pra não somar variável de risco (libs validadas na antiga).
+          newArchEnabled: false,
           // OTA (EAS Update): fingerprint garante que um update JS so cai em
           // builds nativos compativeis. Mudanca nativa (permissao/modulo novo)
           // muda o fingerprint => exige AAB novo; ai o update nao cai em build
@@ -43,8 +46,8 @@ export default {
                   },
                   package: 'com.bluetube.app',
                   // versionCode manual (autoIncrement não suporta app.config.js dinâmico).
-                  // Regra: +1 a cada AAB enviado pra loja. 1.5.0 → 150.
-                  versionCode: 150,
+                  // Regra: +1 a cada AAB enviado pra loja. 1.5.1 → 151 (SDK 53, 16 KB).
+                  versionCode: 151,
                   // Permissões mínimas (política Play 2025/26): foto/vídeo via
                   // Photo Picker do sistema (SEM READ_MEDIA_*); storage legacy fora.
                   permissions: [
