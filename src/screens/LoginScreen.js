@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Alert, Keyboard } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -31,6 +31,9 @@ export default function LoginScreen({ navigation, route }) {
     // Pre-fill apenas o email (UX). Senha NAO eh persistida (Fix 1 PII).
     SecureStore.getItemAsync(EMAIL_KEY).then((e) => { if (e) setEmail(e); }).catch(() => {});
   }, []);
+
+  const emailInputRef = useRef(null);
+  const pwdInputRef = useRef(null);
 
   const handleSubmit = async () => {
     if (!email || !password) { setError('Preencha email e senha'); return; }
@@ -92,6 +95,13 @@ export default function LoginScreen({ navigation, route }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
       }).catch(() => {});
+
+      // Autofill "commit": desfocar os campos + fechar teclado ANTES de sair
+      // da tela é o que faz o Android/Google oferecer "salvar senha?".
+      emailInputRef.current?.blur();
+      pwdInputRef.current?.blur();
+      Keyboard.dismiss();
+      await new Promise((r) => setTimeout(r, 300));
 
       // Guest-first: login é modal sobre o feed — fecha e volta já logado.
       if (navigation.canGoBack()) navigation.goBack();
@@ -164,6 +174,7 @@ export default function LoginScreen({ navigation, route }) {
         <View style={[styles.inputWrap, emailFocus && styles.inputWrapFocus]}>
           <Ionicons name="mail-outline" size={18} color={COLORS.textDim} style={styles.inputIcon} />
           <TextInput
+            ref={emailInputRef}
             style={styles.input}
             placeholder="Email"
             placeholderTextColor={COLORS.textDim}
@@ -172,8 +183,8 @@ export default function LoginScreen({ navigation, route }) {
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
-            autoComplete="email"
-            textContentType="emailAddress"
+            autoComplete="username"
+            textContentType="username"
             importantForAutofill="yes"
             onFocus={() => setEmailFocus(true)}
             onBlur={() => setEmailFocus(false)}
@@ -183,6 +194,7 @@ export default function LoginScreen({ navigation, route }) {
         <View style={[styles.inputWrap, pwdFocus && styles.inputWrapFocus]}>
           <Ionicons name="lock-closed-outline" size={18} color={COLORS.textDim} style={styles.inputIcon} />
           <TextInput
+            ref={pwdInputRef}
             style={styles.input}
             placeholder="Senha"
             placeholderTextColor={COLORS.textDim}
@@ -191,7 +203,7 @@ export default function LoginScreen({ navigation, route }) {
             secureTextEntry={!showPwd}
             autoCapitalize="none"
             autoCorrect={false}
-            autoComplete={mode === 'signup' ? 'new-password' : 'password'}
+            autoComplete={mode === 'signup' ? 'password-new' : 'password'}
             textContentType={mode === 'signup' ? 'newPassword' : 'password'}
             importantForAutofill="yes"
             onFocus={() => setPwdFocus(true)}
