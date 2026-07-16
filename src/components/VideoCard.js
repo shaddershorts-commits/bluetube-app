@@ -8,6 +8,7 @@ import { useNavigation, useIsFocused } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { useFeedStore, useAuthStore } from '../store';
 import { requireAuth } from '../utils/requireAuth';
+import { openModeration } from '../utils/moderation';
 import { COLORS } from '../constants';
 import Avatar from './Avatar';
 import ActionButton from './ActionButton';
@@ -284,6 +285,7 @@ export default function VideoCard({ video, index, cardHeight, activeOverride }) 
         <ActionButton icon="chatbubble-outline" count={video.comments} onPress={() => { if (requireAuth(nav, 'comentar')) nav.navigate('Comentarios', { video_id: video.id }); }} />
         <ActionButton icon={saved ? 'bookmark' : 'bookmark-outline'} count={video.saves} onPress={handleSave} active={saved} color={COLORS.neon} />
         <ActionButton icon="paper-plane-outline" onPress={handleShare} />
+        <ActionButton icon="ellipsis-horizontal" onPress={() => openModeration(nav, { tipoAlvo: 'video', alvoId: video.id, userId: video.user_id, username: video.creator?.username || video.username })} />
       </View>
 
       {muted && (

@@ -7,6 +7,7 @@ import { useNavigation } from '@react-navigation/native';
 import { requireAuth } from '../utils/requireAuth';
 import { Ionicons } from '@expo/vector-icons';
 import Header from '../components/Header';
+import { openModeration } from '../utils/moderation';
 import Avatar from '../components/Avatar';
 import blueAPI from '../api';
 import { COLORS } from '../constants';
@@ -110,7 +111,7 @@ export default function PerfilUsuarioScreen({ route }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: COLORS.background }}>
-      <Header title={`@${profile.username || ''}`} showBack />
+      <Header title={`@${profile.username || ''}`} showBack right={<TouchableOpacity onPress={() => openModeration(nav, { tipoAlvo: 'usuario', alvoId: profile.user_id, userId: profile.user_id, username: profile.username, onBlocked: () => nav.goBack() })} hitSlop={10}><Ionicons name="ellipsis-vertical" size={20} color="#8aa0bd" /></TouchableOpacity>} />
       <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
         <View style={styles.hero}>
           <Avatar uri={profile.avatar_url} initial={profile.display_name || profile.username} size={92} />

@@ -18,6 +18,7 @@ import Avatar from '../components/Avatar';
 import EmojiPicker from '../components/EmojiPicker';
 import blueAPI from '../api';
 import { useAuthStore } from '../store';
+import { openModeration } from '../utils/moderation';
 import { COLORS } from '../constants';
 
 function fmtDur(s) {
@@ -299,6 +300,13 @@ export default function ConversaScreen({ route }) {
           <Text style={styles.headerName} numberOfLines={1}>{headerTitle}</Text>
           <Text style={[styles.headerSub, headerSub === 'online' && { color: '#4ade80' }]} numberOfLines={1}>{headerSub}</Text>
         </TouchableOpacity>
+        {!isGrupo && other?.user_id ? (
+          <TouchableOpacity
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            onPress={() => openModeration(nav, { tipoAlvo: 'usuario', alvoId: other.user_id, userId: other.user_id, username: other.username, onBlocked: () => nav.goBack() })}>
+            <Ionicons name="ellipsis-vertical" size={20} color={COLORS.textSecondary} />
+          </TouchableOpacity>
+        ) : null}
       </View>
 
       <FlatList

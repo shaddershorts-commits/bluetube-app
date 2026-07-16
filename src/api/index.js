@@ -57,6 +57,25 @@ async function api(endpoint, options = {}) {
 }
 
 export const blueAPI = {
+    // Moderação UGC (Play compliance): denunciar + bloquear + lista
+    reportar: async (tipo_alvo, alvo_id, motivo, descricao) => {
+        const token = await getToken();
+        return api('blue-report', { method: 'POST', body: JSON.stringify({ action: 'reportar', token, tipo_alvo, alvo_id, motivo, descricao }) });
+    },
+    bloquear: async (bloqueado_id) => {
+        const token = await getToken();
+        return api('blue-report', { method: 'POST', body: JSON.stringify({ action: 'bloquear', token, bloqueado_id }) });
+    },
+    bloqueados: async () => {
+        const token = await getToken();
+        return api(`blue-report?action=bloqueados&token=${encodeURIComponent(token || '')}`);
+    },
+    // Exclusão de conta (Play compliance) — irreversível
+    deleteAccount: async () => {
+        const token = await getToken();
+        return api('blue-account', { method: 'POST', body: JSON.stringify({ action: 'delete', token }) });
+    },
+
     // GIFs (GIPHY) + figurinhas salvas
     gifSearch: async (q) => {
         const token = await getToken();

@@ -15,6 +15,7 @@ import EmojiPicker from '../components/EmojiPicker';
 import blueAPI from '../api';
 import { useAuthStore } from '../store';
 import { requireAuth } from '../utils/requireAuth';
+import { openModeration } from '../utils/moderation';
 import { COLORS } from '../constants';
 
 function ago(iso) {
@@ -28,12 +29,12 @@ function ago(iso) {
 }
 
 // Uma linha de comentário (raiz ou resposta)
-function CommentRow({ item, onLike, onReply, isReply }) {
+function CommentRow({ item, onLike, onReply, onModerate, isReply }) {
   const nav = useNavigation();
   const c = item.creator || {};
   const openProfile = () => item.user_id && nav.navigate('PerfilUsuario', { user_id: item.user_id });
   return (
-    <View style={[styles.item, isReply && styles.itemReply]}>
+    <TouchableOpacity activeOpacity={0.9} onLongPress={() => onModerate && onModerate(item)} delayLongPress={350} style={[styles.item, isReply && styles.itemReply]}>
       <TouchableOpacity onPress={openProfile}>
         <Avatar uri={c.avatar_url} initial={c.display_name || c.username} size={isReply ? 28 : 36} />
       </TouchableOpacity>
@@ -61,7 +62,7 @@ function CommentRow({ item, onLike, onReply, isReply }) {
         />
         {item.likes > 0 ? <Text style={styles.likeCount}>{item.likes}</Text> : null}
       </TouchableOpacity>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -69,6 +70,7 @@ export default function ComentariosScreen({ route }) {
   const { video_id } = route.params;
   const nav = useNavigation();
   const user = useAuthStore((s) => s.user);
+  const blockedIds = useAuthStore((s) => s.blockedIds);
   const [comments, setComments] = useState([]); // flat, com creator
   const [loading, setLoading] = useState(true);
   const [texto, setTexto] = useState('');
@@ -89,11 +91,12 @@ export default function ComentariosScreen({ route }) {
 
   // Threading: raízes (parent_id null) ordenadas por curtidas → recência;
   // respostas agrupadas por parent, mais antigas primeiro.
-  const roots = comments
+  const visiveis = comments.filter((c) => !blockedIds.includes(c.user_id));
+  const roots = visiveis
     .filter((c) => !c.parent_id)
     .sort((a, b) => (b.likes || 0) - (a.likes || 0) || new Date(b.created_at) - new Date(a.created_at));
   const repliesByParent = {};
-  comments.filter((c) => c.parent_id).forEach((c) => {
+  visiveis.filter((c) => c.parent_id).forEach((c) => {
     (repliesByParent[c.parent_id] = repliesByParent[c.parent_id] || []).push(c);
   });
   Object.values(repliesByParent).forEach((arr) => arr.sort((a, b) => new Date(a.created_at) - new Date(b.created_at)));
@@ -149,9 +152,17 @@ export default function ComentariosScreen({ route }) {
   const enviar = () => { const t = texto.trim(); if (t) enviarTexto(t); };
   const enviarGif = (url) => { setShowEmoji(false); enviarTexto('[gif]' + url); };
 
+  const handleModerate = (item) => {
+    openModeration(nav, {
+      tipoAlvo: 'comentario', alvoId: item.id,
+      userId: item.user_id !== user?.id ? item.user_id : null,
+      username: (item.creator || {}).username,
+    });
+  };
+
   const renderRow = ({ item: row }) => {
     if (row.type === 'root' || row.type === 'reply') {
-      return <CommentRow item={row.item} onLike={handleLike} onReply={handleReply} isReply={row.type === 'reply'} />;
+      return <CommentRow item={row.item} onLike={handleLike} onReply={handleReply} onModerate={handleModerate} isReply={row.type === 'reply'} />;
     }
     if (row.type === 'expand') {
       return (

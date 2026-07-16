@@ -6,6 +6,18 @@ export const useAuthStore = create((set) => ({
   user: null,
   introSeen: false,
   isLoading: true,
+  // Usuários bloqueados (moderação UGC) — filtro client-side em comentários/chat;
+  // o feed já é filtrado no servidor. Carregado após login (loadBlocked).
+  blockedIds: [],
+  addBlocked: (id) => set((s) => ({ blockedIds: s.blockedIds.includes(id) ? s.blockedIds : [...s.blockedIds, id] })),
+  removeBlocked: (id) => set((s) => ({ blockedIds: s.blockedIds.filter((b) => b !== id) })),
+  loadBlocked: async () => {
+    try {
+      const { default: blueAPI } = require('../api');
+      const d = await blueAPI.bloqueados();
+      set({ blockedIds: (d?.bloqueados || []).map((b) => b.bloqueado_id) });
+    } catch (e) {}
+  },
   setToken: async (token) => {
     if (token) await SecureStore.setItemAsync('bt_token', token);
     else await SecureStore.deleteItemAsync('bt_token');
@@ -100,6 +112,8 @@ export const useAuthStore = create((set) => ({
         introSeen: introFlag === '1',
         isLoading: false,
       });
+      // Lista de bloqueados (moderação) — fire-and-forget pós-login
+      if (validToken) useAuthStore.getState().loadBlocked();
     } catch (e) {
       console.error('[useAuthStore.init] erro:', e?.message || e);
       set({ isLoading: false });
