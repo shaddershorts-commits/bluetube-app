@@ -7,8 +7,12 @@ export default {
           // builds nativos compativeis. Mudanca nativa (permissao/modulo novo)
           // muda o fingerprint => exige AAB novo; ai o update nao cai em build
           // antigo por engano. Polir features e funcoes JS = OTA instantaneo.
+          // appVersion (não fingerprint): fingerprint quebra no Windows com
+          // core.autocrlf=true (hash local CRLF ≠ hash LF do builder EAS).
+          // Regra: mudança NATIVA sempre acompanha bump de version — update JS
+          // só cai em build da MESMA version.
           runtimeVersion: {
-                  policy: 'fingerprint',
+                  policy: 'appVersion',
           },
           updates: {
                   url: 'https://u.expo.dev/c7a657a7-92a2-42ba-9cab-77a54a62077f',
