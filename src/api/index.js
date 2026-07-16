@@ -57,6 +57,73 @@ async function api(endpoint, options = {}) {
 }
 
 export const blueAPI = {
+    // Chat v3: fixar/apagar conversa, contatos, msg delete/edit, share
+    convPin: async (conv_id) => {
+        const token = await getToken();
+        return api('blue-chat', { method: 'POST', body: JSON.stringify({ action: 'conv-pin', token, conv_id }) });
+    },
+    convClear: async (conv_id) => {
+        const token = await getToken();
+        return api('blue-chat', { method: 'POST', body: JSON.stringify({ action: 'conv-clear', token, conv_id }) });
+    },
+    contatoAdd: async (user_id) => {
+        const token = await getToken();
+        return api('blue-chat', { method: 'POST', body: JSON.stringify({ action: 'contato-add', token, user_id }) });
+    },
+    msgDelete: async (message_id, scope) => {
+        const token = await getToken();
+        return api('blue-chat', { method: 'POST', body: JSON.stringify({ action: 'msg-delete', token, message_id, scope }) });
+    },
+    msgEdit: async (message_id, text) => {
+        const token = await getToken();
+        return api('blue-chat', { method: 'POST', body: JSON.stringify({ action: 'msg-edit', token, message_id, text }) });
+    },
+    topChats: async () => {
+        const token = await getToken();
+        return api(`blue-chat?action=top-chats&token=${encodeURIComponent(token || '')}`);
+    },
+    videoInfo: async (id) => {
+        const token = await getToken();
+        return api(`blue-chat?action=video-info&id=${encodeURIComponent(id)}&token=${encodeURIComponent(token || '')}`);
+    },
+    // Grupos v3
+    grupoEditar: async (grupo_id, patch) => {
+        const token = await getToken();
+        return api('blue-grupos', { method: 'POST', body: JSON.stringify({ action: 'editar', token, grupo_id, ...patch }) });
+    },
+    grupoOnlyAdmins: async (grupo_id) => {
+        const token = await getToken();
+        return api('blue-grupos', { method: 'POST', body: JSON.stringify({ action: 'only-admins', token, grupo_id }) });
+    },
+    grupoSetRole: async (grupo_id, user_id, role) => {
+        const token = await getToken();
+        return api('blue-grupos', { method: 'POST', body: JSON.stringify({ action: 'set-role', token, grupo_id, user_id, role }) });
+    },
+    grupoRemoverMembro: async (grupo_id, user_id) => {
+        const token = await getToken();
+        return api('blue-grupos', { method: 'POST', body: JSON.stringify({ action: 'remover-membro', token, grupo_id, user_id }) });
+    },
+    grupoAdicionarMembro: async (grupo_id, user_id) => {
+        const token = await getToken();
+        return api('blue-grupos', { method: 'POST', body: JSON.stringify({ action: 'adicionar', token, grupo_id, user_id }) });
+    },
+    grupoExcluir: async (grupo_id) => {
+        const token = await getToken();
+        return api('blue-grupos', { method: 'POST', body: JSON.stringify({ action: 'excluir', token, grupo_id }) });
+    },
+    grupoSair: async (grupo_id) => {
+        const token = await getToken();
+        return api('blue-grupos', { method: 'POST', body: JSON.stringify({ action: 'sair', token, grupo_id }) });
+    },
+    gmsgDelete: async (message_id, scope) => {
+        const token = await getToken();
+        return api('blue-grupos', { method: 'POST', body: JSON.stringify({ action: 'gmsg-delete', token, message_id, scope }) });
+    },
+    gmsgEdit: async (message_id, text) => {
+        const token = await getToken();
+        return api('blue-grupos', { method: 'POST', body: JSON.stringify({ action: 'gmsg-edit', token, message_id, text }) });
+    },
+
     // Moderação UGC (Play compliance): denunciar + bloquear + lista
     reportar: async (tipo_alvo, alvo_id, motivo, descricao) => {
         const token = await getToken();

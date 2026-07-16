@@ -11,6 +11,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Avatar from '../components/Avatar';
 import blueAPI from '../api';
+import GlassMenu from '../components/GlassMenu';
+import { openModeration } from '../utils/moderation';
 import { COLORS } from '../constants';
 
 function fmtHora(iso) {
@@ -35,6 +37,8 @@ export default function ChatScreen() {
   const [statusGroups, setStatusGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [convMenu, setConvMenu] = useState(null); // item alvo do long-press
+  const [showRequests, setShowRequests] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -53,20 +57,42 @@ export default function ChatScreen() {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   // Lista unificada: 1:1 + grupos, ordenada por última mensagem
-  const itens = [
+  const todos = [
     ...conversas.map((c) => ({ tipo: '1a1', id: 'c_' + c.id, nome: (c.other?.display_name || c.other?.username || 'Usuário'), sub: c.last_message || 'Sem mensagens', quando: c.last_message_at, unread: c.unread || 0, raw: c })),
     ...grupos.map((g) => ({ tipo: 'grupo', id: 'g_' + g.id, nome: g.nome, sub: g.last_message || (g.descricao || 'Grupo'), quando: g.last_message_at || g.created_at, unread: 0, raw: g })),
   ]
     .filter((i) => !busca.trim() || i.nome.toLowerCase().includes(busca.trim().toLowerCase()))
     .sort((a, b) => new Date(b.quando || 0) - new Date(a.quando || 0));
 
+  // "Novos contatos": quem me chamou e eu ainda não adicionei (estilo WhatsApp)
+  const requests = todos.filter((i) => i.tipo === '1a1' && i.raw.is_request);
+  const principais = todos
+    .filter((i) => !(i.tipo === '1a1' && i.raw.is_request))
+    .sort((a, b) => ((b.raw.pinned ? 1 : 0) - (a.raw.pinned ? 1 : 0)) || (new Date(b.quando || 0) - new Date(a.quando || 0)));
+  const itens = [
+    ...(requests.length ? [{ tipo: 'reqheader', id: 'reqheader', count: requests.reduce((n, r) => n + (r.unread || 0), 0) || requests.length }] : []),
+    ...(showRequests ? requests : []),
+    ...principais,
+  ];
+
   const abrir = (item) => {
     if (item.tipo === 'grupo') nav.navigate('Conversa', { grupo: item.raw });
-    else nav.navigate('Conversa', { conversation_id: item.raw.id, other: item.raw.other });
+    else nav.navigate('Conversa', { conversation_id: item.raw.id, other: item.raw.other, is_request: !!item.raw.is_request });
   };
 
-  const renderConversa = ({ item }) => (
-    <TouchableOpacity style={styles.item} onPress={() => abrir(item)}>
+  const renderConversa = ({ item }) => {
+    if (item.tipo === 'reqheader') {
+      return (
+        <TouchableOpacity style={styles.reqHeader} onPress={() => setShowRequests((v) => !v)}>
+          <View style={styles.reqBell}><Ionicons name="notifications" size={16} color="#fff" /></View>
+          <Text style={styles.reqTitle}>Novos contatos</Text>
+          <View style={styles.reqBadge}><Text style={styles.reqBadgeText}>{item.count}</Text></View>
+          <Ionicons name={showRequests ? 'chevron-up' : 'chevron-down'} size={16} color={COLORS.textDim} style={{ marginLeft: 'auto' }} />
+        </TouchableOpacity>
+      );
+    }
+    return (
+    <TouchableOpacity style={styles.item} onPress={() => abrir(item)} onLongPress={() => setConvMenu(item)} delayLongPress={350}>
       {item.tipo === 'grupo'
         ? <View style={styles.groupAv}><Ionicons name="people" size={22} color={COLORS.neon} /></View>
         : <Avatar uri={item.raw.other?.avatar_url} initial={item.nome} size={50} />}
@@ -76,10 +102,31 @@ export default function ChatScreen() {
       </View>
       <View style={styles.meta}>
         <Text style={[styles.hora, item.unread > 0 && { color: COLORS.neon }]}>{fmtHora(item.quando)}</Text>
-        {item.unread > 0 && <View style={styles.badge}><Text style={styles.badgeText}>{item.unread}</Text></View>}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          {item.raw.pinned ? <Ionicons name="pin" size={13} color={COLORS.textDim} /> : null}
+          {item.unread > 0 && <View style={styles.badge}><Text style={styles.badgeText}>{item.unread}</Text></View>}
+        </View>
       </View>
     </TouchableOpacity>
-  );
+    );
+  };
+
+  // Ações do long-press (menu liquid glass)
+  const convMenuOptions = () => {
+    const it = convMenu;
+    if (!it) return [];
+    if (it.tipo === 'grupo') {
+      return [
+        { icon: 'information-circle-outline', label: 'Dados do grupo', onPress: () => nav.navigate('GrupoInfo', { grupo: it.raw }) },
+        { icon: 'exit-outline', label: 'Sair do grupo', danger: true, onPress: async () => { await blueAPI.grupoSair(it.raw.id).catch(() => {}); load(); } },
+      ];
+    }
+    return [
+      { icon: 'pin-outline', label: it.raw.pinned ? 'Desafixar conversa' : 'Fixar conversa', onPress: async () => { await blueAPI.convPin(it.raw.id).catch(() => {}); load(); } },
+      { icon: 'trash-outline', label: 'Apagar conversa', danger: true, onPress: async () => { await blueAPI.convClear(it.raw.id).catch(() => {}); load(); } },
+      { icon: 'hand-left-outline', label: 'Bloquear', danger: true, onPress: () => openModeration(nav, { tipoAlvo: 'usuario', alvoId: it.raw.other?.user_id, userId: it.raw.other?.user_id, username: it.raw.other?.username, onBlocked: () => load() }) },
+    ];
+  };
 
   const renderStatus = ({ item }) => {
     const vistos = item.stories.every((s) => s.visto);
@@ -198,11 +245,24 @@ export default function ChatScreen() {
           </View>
         </Pressable>
       </Modal>
+
+      {/* Menu liquid glass do long-press na conversa */}
+      <GlassMenu
+        visible={!!convMenu}
+        title={convMenu?.nome}
+        options={convMenuOptions()}
+        onClose={() => setConvMenu(null)}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  reqHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 12, marginBottom: 6, padding: 12, borderRadius: 14, backgroundColor: 'rgba(0,170,255,0.07)', borderWidth: 1, borderColor: 'rgba(0,170,255,0.2)' },
+  reqBell: { width: 28, height: 28, borderRadius: 14, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
+  reqTitle: { color: COLORS.text, fontSize: 14, fontWeight: '700' },
+  reqBadge: { backgroundColor: '#ff4757', borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
+  reqBadgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   topbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10 },
   title: { color: COLORS.text, fontSize: 20, fontWeight: '800' },
   tabs: { flexDirection: 'row', paddingHorizontal: 10, gap: 6, marginBottom: 8 },

@@ -24,6 +24,7 @@ import CameraScreen from '../screens/CameraScreen';
 import ChatScreen from '../screens/ChatScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import ConversaScreen from '../screens/ConversaScreen';
+import GrupoInfoScreen from '../screens/GrupoInfoScreen';
 import PerfilUsuarioScreen from '../screens/PerfilUsuarioScreen';
 import ComentariosScreen from '../screens/ComentariosScreen';
 import LiveScreen from '../screens/LiveScreen';
@@ -229,6 +230,7 @@ export default function Navigation() {
                        </Stack.Group>
                        <Stack.Screen name="SetupPerfil" component={SetupPerfilScreen} />
                        <Stack.Screen name="Conversa" component={ConversaScreen} />
+                       <Stack.Screen name="GrupoInfo" component={GrupoInfoScreen} />
                        <Stack.Screen name="PerfilUsuario" component={PerfilUsuarioScreen} />
                        <Stack.Screen name="Comentarios" component={ComentariosScreen} />
                        <Stack.Screen name="Live" component={LiveScreen} />

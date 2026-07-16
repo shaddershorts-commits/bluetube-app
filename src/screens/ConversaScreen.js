@@ -6,7 +6,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, TextInput, FlatList, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, ActivityIndicator, Image, Alert, Keyboard,
+  KeyboardAvoidingView, Platform, ActivityIndicator, Image, Alert, Keyboard, Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Video, ResizeMode, Audio } from 'expo-av';
@@ -19,6 +19,8 @@ import EmojiPicker from '../components/EmojiPicker';
 import blueAPI from '../api';
 import { useAuthStore } from '../store';
 import { openModeration } from '../utils/moderation';
+import GlassMenu from '../components/GlassMenu';
+import ShareCard from '../components/ShareCard';
 import { COLORS } from '../constants';
 
 function fmtDur(s) {
@@ -86,7 +88,7 @@ function AudioBubble({ msg, mine }) {
 export default function ConversaScreen({ route }) {
   // 1:1: { conversation_id, other } ou { initNewChat, other }
   // grupo: { grupo }
-  const { conversation_id: paramConvId, other, initNewChat, grupo } = route.params || {};
+  const { conversation_id: paramConvId, other, initNewChat, grupo, is_request } = route.params || {};
   const isGrupo = !!grupo;
   const nav = useNavigation();
   const insets = useSafeAreaInsets();
@@ -100,6 +102,10 @@ export default function ConversaScreen({ route }) {
   const [gravSecs, setGravSecs] = useState(0);
   const [presence, setPresence] = useState(null);
   const [membrosCount, setMembrosCount] = useState(null);
+  const [msgMenu, setMsgMenu] = useState(null);       // mensagem alvo do long-press
+  const [editing, setEditing] = useState(null);       // mensagem em edição
+  const [requestPend, setRequestPend] = useState(!!is_request); // banner Novos contatos
+  const [meuRole, setMeuRole] = useState('membro');   // meu papel no grupo
   const recordingRef = useRef(null);
   const gravTimerRef = useRef(null);
   const listRef = useRef(null);
@@ -155,7 +161,12 @@ export default function ConversaScreen({ route }) {
   // Membros do grupo (subtítulo)
   useEffect(() => {
     if (!isGrupo) return;
-    blueAPI.grupoMembros(grupo.id).then((d) => setMembrosCount((d?.membros || []).length)).catch(() => {});
+    blueAPI.grupoMembros(grupo.id).then((d) => {
+      const ms = d?.membros || [];
+      setMembrosCount(ms.length);
+      const eu = ms.find((m) => m.user_id === myId);
+      if (eu?.role) setMeuRole(eu.role);
+    }).catch(() => {});
   }, [isGrupo, grupo?.id]);
 
   const enviarConteudo = async (msgTexto, media) => {
@@ -177,9 +188,52 @@ export default function ConversaScreen({ route }) {
   const enviar = async () => {
     const t = texto.trim();
     if (!t || enviando) return;
+    if (editing) {
+      setEnviando(true);
+      const r = isGrupo ? await blueAPI.gmsgEdit(editing.id, t).catch((e) => ({ error: e.message }))
+                        : await blueAPI.msgEdit(editing.id, t).catch((e) => ({ error: e.message }));
+      setEnviando(false);
+      if (r?.error) { Alert.alert('Não deu pra editar', r.error); return; }
+      setEditing(null); setTexto('');
+      load();
+      return;
+    }
     setTexto('');
     const ok = await enviarConteudo(t, null);
     if (!ok) setTexto(t);
+  };
+
+  // Long-press na mensagem → opções (apagar pra mim / apagar envio / editar)
+  const msgMenuOptions = () => {
+    const m = msgMenu;
+    if (!m) return [];
+    const senderId = isGrupo ? m.user_id : m.sender_id;
+    const minha = senderId === myId;
+    const dentro3h = Date.now() - new Date(m.created_at).getTime() <= 3 * 3600 * 1000;
+    const apagar = async (scope) => {
+      const r = isGrupo ? await blueAPI.gmsgDelete(m.id, scope).catch((e) => ({ error: e.message }))
+                        : await blueAPI.msgDelete(m.id, scope).catch((e) => ({ error: e.message }));
+      if (r?.error) Alert.alert('Não deu pra apagar', r.error); else load();
+    };
+    const opts = [{ icon: 'trash-outline', label: 'Apagar pra mim', onPress: () => apagar('me') }];
+    if (minha && dentro3h && !m.deleted_for_all) {
+      opts.push({ icon: 'trash-bin-outline', label: 'Apagar envio', danger: true, onPress: () => apagar('all') });
+      const body = m.text || m.mensagem || '';
+      if (body && (m.edited_count || 0) < 3) {
+        opts.push({ icon: 'pencil-outline', label: 'Editar' + (m.edited_count ? ` (${3 - m.edited_count} restantes)` : ''), onPress: () => { setEditing(m); setTexto(body); } });
+      }
+    }
+    if (!minha && isGrupo && meuRole === 'admin' && !m.deleted_for_all) {
+      opts.push({ icon: 'shield-outline', label: 'Apagar pra todos (admin)', danger: true, onPress: () => apagar('all') });
+    }
+    return opts;
+  };
+
+  // Aceitar "novo contato" → conversa vai pra lista principal
+  const aceitarContato = async () => {
+    if (!other?.user_id) return;
+    await blueAPI.contatoAdd(other.user_id).catch(() => {});
+    setRequestPend(false);
   };
 
   // Foto/vídeo/GIF da galeria
@@ -244,9 +298,11 @@ export default function ConversaScreen({ route }) {
   const headerSub = isGrupo
     ? (membrosCount != null ? membrosCount + ' membros' : ' ')
     : presence
-      ? (presence.status === 'online' && presence.status_updated_at && (Date.now() - new Date(presence.status_updated_at).getTime()) < 150000
-          ? 'online'
-          : fmtLastSeen(presence.status_updated_at))
+      ? (presence.status === 'hidden'
+          ? ' ' // privacidade: novos contatos não veem online/visto por último
+          : presence.status === 'online' && presence.status_updated_at && (Date.now() - new Date(presence.status_updated_at).getTime()) < 150000
+            ? 'online'
+            : fmtLastSeen(presence.status_updated_at))
       : ' ';
 
   if (resolving) {
@@ -266,7 +322,15 @@ export default function ConversaScreen({ route }) {
     const mine = senderId === myId;
     const body = item.text || item.mensagem || '';
     const media = item.media_url ? { url: item.media_url, type: item.media_type, duration: item.media_duration } : null;
+    if (item.deleted_for_all) {
+      return (
+        <View style={[styles.bubble, mine ? styles.mine : styles.other]}>
+          <Text style={styles.msgApagada}>🚫 Mensagem apagada</Text>
+        </View>
+      );
+    }
     return (
+      <Pressable onLongPress={() => setMsgMenu(item)} delayLongPress={320}>
       <View style={[styles.bubble, mine ? styles.mine : styles.other, media && styles.bubbleMedia]}>
         {isGrupo && !mine && (
           <Text style={styles.autorNome}>@{item.autor?.username || 'membro'}</Text>
@@ -277,10 +341,16 @@ export default function ConversaScreen({ route }) {
           <Video source={{ uri: media.url }} style={styles.imgMsg} resizeMode={ResizeMode.COVER} useNativeControls />
         ) : media?.type === 'audio' ? (
           <AudioBubble msg={item} mine={mine} />
+        ) : media?.type === 'share' ? (
+          <ShareCard videoId={media.url} />
         ) : null}
         {body ? <Text style={[styles.msg, mine && { color: '#fff' }]}>{body}</Text> : null}
-        {mine && !isGrupo ? <View style={styles.tickRow}><Ticks msg={item} /></View> : null}
+        <View style={styles.tickRow}>
+          {item.edited_at ? <Text style={styles.editada}>editada</Text> : null}
+          {mine && !isGrupo ? <Ticks msg={item} /> : null}
+        </View>
       </View>
+      </Pressable>
     );
   };
 
@@ -296,7 +366,9 @@ export default function ConversaScreen({ route }) {
           : <Avatar uri={other?.avatar_url} initial={other?.display_name || other?.username} size={38} />}
         <TouchableOpacity
           style={{ flex: 1 }}
-          onPress={() => !isGrupo && other?.user_id && nav.navigate('PerfilUsuario', { user_id: other.user_id })}>
+          onPress={() => isGrupo
+            ? nav.navigate('GrupoInfo', { grupo })
+            : (other?.user_id && nav.navigate('PerfilUsuario', { user_id: other.user_id }))}>
           <Text style={styles.headerName} numberOfLines={1}>{headerTitle}</Text>
           <Text style={[styles.headerSub, headerSub === 'online' && { color: '#4ade80' }]} numberOfLines={1}>{headerSub}</Text>
         </TouchableOpacity>
@@ -324,6 +396,32 @@ export default function ConversaScreen({ route }) {
           <Ionicons name="mic" size={20} color="#ef4444" />
           <Text style={styles.gravText}>Gravando… {fmtDur(gravSecs)}</Text>
           <Text style={styles.gravHint}>toque no botão pra enviar</Text>
+        </View>
+      ) : null}
+
+      {/* Novo contato: quem te chamou ainda não está na sua lista */}
+      {requestPend && !isGrupo ? (
+        <View style={styles.reqBanner}>
+          <Text style={styles.reqBannerText}>@{other?.username || 'usuário'} não está nos seus contatos</Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TouchableOpacity style={styles.reqAddBtn} onPress={aceitarContato}>
+              <Text style={styles.reqAddText}>➕ Adicionar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.reqBlockBtn} onPress={() => openModeration(nav, { tipoAlvo: 'usuario', alvoId: other?.user_id, userId: other?.user_id, username: other?.username, onBlocked: () => nav.goBack() })}>
+              <Text style={styles.reqBlockText}>Bloquear</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
+
+      {/* Barra de edição ativa */}
+      {editing ? (
+        <View style={styles.editBar}>
+          <Ionicons name="pencil" size={14} color={COLORS.neon} />
+          <Text style={styles.editBarText} numberOfLines={1}>Editando mensagem</Text>
+          <TouchableOpacity onPress={() => { setEditing(null); setTexto(''); }} hitSlop={10}>
+            <Ionicons name="close" size={16} color={COLORS.textDim} />
+          </TouchableOpacity>
         </View>
       ) : null}
 
@@ -362,11 +460,29 @@ export default function ConversaScreen({ route }) {
           onGif={(url) => { setShowEmoji(false); enviarConteudo('', { url, type: 'gif' }); }}
         />
       ) : null}
+
+      {/* Menu liquid glass do long-press na mensagem */}
+      <GlassMenu
+        visible={!!msgMenu}
+        title="Mensagem"
+        options={msgMenuOptions()}
+        onClose={() => setMsgMenu(null)}
+      />
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  msgApagada: { color: COLORS.textDim, fontSize: 13, fontStyle: 'italic' },
+  editada: { color: 'rgba(255,255,255,0.45)', fontSize: 10, fontStyle: 'italic', marginRight: 4 },
+  reqBanner: { marginHorizontal: 12, marginBottom: 6, padding: 12, borderRadius: 14, backgroundColor: 'rgba(0,170,255,0.07)', borderWidth: 1, borderColor: 'rgba(0,170,255,0.2)', gap: 8 },
+  reqBannerText: { color: COLORS.textSecondary, fontSize: 12.5, textAlign: 'center' },
+  reqAddBtn: { flex: 1, backgroundColor: COLORS.primary, borderRadius: 10, paddingVertical: 9, alignItems: 'center' },
+  reqAddText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  reqBlockBtn: { flex: 1, borderWidth: 1, borderColor: 'rgba(248,113,113,0.4)', borderRadius: 10, paddingVertical: 9, alignItems: 'center' },
+  reqBlockText: { color: '#f87171', fontSize: 13, fontWeight: '700' },
+  editBar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginBottom: 4, paddingVertical: 7, paddingHorizontal: 12, borderRadius: 10, backgroundColor: 'rgba(0,170,255,0.08)' },
+  editBarText: { color: COLORS.textSecondary, fontSize: 12, flex: 1 },
   container: { flex: 1, backgroundColor: COLORS.background },
   header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: COLORS.border, backgroundColor: COLORS.surface },
   headerName: { color: COLORS.text, fontSize: 15, fontWeight: '700' },

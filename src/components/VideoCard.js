@@ -12,6 +12,7 @@ import { openModeration } from '../utils/moderation';
 import { COLORS } from '../constants';
 import Avatar from './Avatar';
 import ActionButton from './ActionButton';
+import ShareSheet from './ShareSheet';
 import blueAPI from '../api';
 
 const DOUBLE_TAP_MS = 260;
@@ -60,6 +61,7 @@ export default function VideoCard({ video, index, cardHeight, activeOverride }) 
   const [likes, setLikes] = useState(video.likes || 0);
   const [rate2x, setRate2x] = useState(false);
   const [fitMode, setFitMode] = useState(() => pickResizeMode(video.width, video.height));
+  const [shareOpen, setShareOpen] = useState(false);
 
   const heartScale = useRef(new Animated.Value(0)).current;
   const heartOpacity = useRef(new Animated.Value(0)).current;
@@ -157,6 +159,10 @@ export default function VideoCard({ video, index, cardHeight, activeOverride }) 
 
   const handleShare = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    // Logado: sheet interno (pessoas que mais conversa) + externo.
+    // Convidado: direto pro share do sistema.
+    const { token } = require('../store').useAuthStore.getState();
+    if (token) { setShareOpen(true); return; }
     try {
       await Share.share({
         message: `${video.title || 'Vídeo no Blue'} — https://bluetubeviral.com/blue-video.html?v=${video.id}`,
@@ -303,6 +309,9 @@ export default function VideoCard({ video, index, cardHeight, activeOverride }) 
           <Text style={styles.rateChipText}>⚡ 2x</Text>
         </View>
       )}
+
+      {/* Compartilhar dentro do Blue (pessoas/grupos que mais conversa) */}
+      <ShareSheet visible={shareOpen} video={video} onClose={() => setShareOpen(false)} />
     </View>
   );
 }
