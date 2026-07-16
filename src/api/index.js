@@ -57,6 +57,24 @@ async function api(endpoint, options = {}) {
 }
 
 export const blueAPI = {
+    // GIFs (GIPHY) + figurinhas salvas
+    gifSearch: async (q) => {
+        const token = await getToken();
+        return api(`blue-gifs?action=search&q=${encodeURIComponent(q || '')}&token=${encodeURIComponent(token || '')}`);
+    },
+    stickers: async () => {
+        const token = await getToken();
+        return api(`blue-gifs?action=stickers&token=${encodeURIComponent(token || '')}`);
+    },
+    saveSticker: async (url) => {
+        const token = await getToken();
+        return api('blue-gifs', { method: 'POST', body: JSON.stringify({ action: 'save-sticker', token, url }) });
+    },
+    delSticker: async (url) => {
+        const token = await getToken();
+        return api('blue-gifs', { method: 'POST', body: JSON.stringify({ action: 'del-sticker', token, url }) });
+    },
+
     // Auth
     signin: (email, password) => api('auth', { method: 'POST', body: JSON.stringify({ action: 'signin', email, password }) }),
     signup: (email, password) => api('auth', { method: 'POST', body: JSON.stringify({ action: 'signup', email, password }) }),

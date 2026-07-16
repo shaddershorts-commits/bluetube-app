@@ -4,13 +4,14 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, TextInput, FlatList, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, Alert, ActivityIndicator,
+  KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Image, Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import Header from '../components/Header';
 import Avatar from '../components/Avatar';
+import EmojiPicker from '../components/EmojiPicker';
 import blueAPI from '../api';
 import { useAuthStore } from '../store';
 import { requireAuth } from '../utils/requireAuth';
@@ -43,7 +44,9 @@ function CommentRow({ item, onLike, onReply, isReply }) {
           </TouchableOpacity>
           <Text style={styles.time}>· {ago(item.created_at)}</Text>
         </View>
-        <Text style={styles.text}>{item.text}</Text>
+        {(item.text || '').startsWith('[gif]')
+          ? <Image source={{ uri: item.text.slice(5) }} style={styles.gifComment} resizeMode="cover" />
+          : <Text style={styles.text}>{item.text}</Text>}
         <View style={styles.actions}>
           <TouchableOpacity onPress={() => onReply(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Text style={styles.replyBtn}>Responder</Text>
@@ -72,6 +75,7 @@ export default function ComentariosScreen({ route }) {
   const [replyTo, setReplyTo] = useState(null); // comentário-raiz sendo respondido
   const [expanded, setExpanded] = useState({}); // { [parentId]: true }
   const [sending, setSending] = useState(false);
+  const [showEmoji, setShowEmoji] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -130,12 +134,11 @@ export default function ComentariosScreen({ route }) {
     setExpanded((e) => ({ ...e, [root.id]: true }));
   };
 
-  const enviar = async () => {
-    const t = texto.trim();
-    if (!t || sending) return;
+  const enviarTexto = async (conteudo) => {
+    if (sending) return;
     if (!requireAuth(nav, 'comentar')) return;
     setSending(true);
-    const r = await blueAPI.comentar(video_id, t, replyTo?.id).catch((e) => ({ error: e.message }));
+    const r = await blueAPI.comentar(video_id, conteudo, replyTo?.id).catch((e) => ({ error: e.message }));
     setSending(false);
     if (r?.error) { Alert.alert('Não foi possível comentar', r.error); return; }
     setTexto('');
@@ -143,6 +146,8 @@ export default function ComentariosScreen({ route }) {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     load();
   };
+  const enviar = () => { const t = texto.trim(); if (t) enviarTexto(t); };
+  const enviarGif = (url) => { setShowEmoji(false); enviarTexto('[gif]' + url); };
 
   const renderRow = ({ item: row }) => {
     if (row.type === 'root' || row.type === 'reply') {
@@ -189,6 +194,9 @@ export default function ComentariosScreen({ route }) {
         </View>
       ) : null}
       <View style={styles.inputBar}>
+        <TouchableOpacity style={styles.emojiBtn} onPress={() => { Keyboard.dismiss(); setShowEmoji((s) => !s); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Ionicons name={showEmoji ? 'keypad-outline' : 'happy-outline'} size={24} color={COLORS.textSecondary} />
+        </TouchableOpacity>
         <TextInput
           style={styles.input}
           placeholder={replyTo ? `Responder @${replyTo.username}…` : 'Adicionar comentário…'}
@@ -197,6 +205,7 @@ export default function ComentariosScreen({ route }) {
           onChangeText={setTexto}
           multiline
           onSubmitEditing={enviar}
+          onFocus={() => setShowEmoji(false)}
         />
         <TouchableOpacity style={styles.send} onPress={enviar} disabled={sending || !texto.trim()}>
           {sending
@@ -204,6 +213,9 @@ export default function ComentariosScreen({ route }) {
             : <Ionicons name="send" color={texto.trim() ? COLORS.neon : COLORS.textDim} size={22} />}
         </TouchableOpacity>
       </View>
+      {showEmoji ? (
+        <EmojiPicker mode="comment" onPick={(e) => setTexto((t) => t + e)} onGif={enviarGif} />
+      ) : null}
     </KeyboardAvoidingView>
   );
 }
@@ -211,6 +223,8 @@ export default function ComentariosScreen({ route }) {
 const styles = StyleSheet.create({
   item: { flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 10, gap: 10, alignItems: 'flex-start' },
   itemReply: { paddingLeft: 40, backgroundColor: 'rgba(255,255,255,0.015)' },
+  gifComment: { width: 160, height: 160, borderRadius: 12, marginTop: 4, backgroundColor: 'rgba(255,255,255,0.04)' },
+  emojiBtn: { paddingHorizontal: 4, paddingVertical: 6, alignSelf: 'flex-end' },
   rowTop: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   user: { color: COLORS.neon, fontSize: 12, fontWeight: '700' },
   time: { color: COLORS.textDim, fontSize: 11 },

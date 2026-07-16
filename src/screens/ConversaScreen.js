@@ -348,7 +348,13 @@ export default function ConversaScreen({ route }) {
         )}
       </View>
 
-      {showEmoji ? <EmojiPicker onPick={(e) => setTexto((t) => t + e)} /> : null}
+      {showEmoji ? (
+        <EmojiPicker
+          mode="chat"
+          onPick={(e) => setTexto((t) => t + e)}
+          onGif={(url) => { setShowEmoji(false); enviarConteudo('', { url, type: 'gif' }); }}
+        />
+      ) : null}
     </KeyboardAvoidingView>
   );
 }

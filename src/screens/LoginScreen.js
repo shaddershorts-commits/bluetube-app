@@ -11,6 +11,7 @@ import blueAPI from '../api';
 import LogoBlueTube from '../components/LogoBlueTube';
 
 const EMAIL_KEY = 'bt_last_email';
+const PWD_KEY = 'bt_saved_password'; // opt-in "salvar senha" — SecureStore (Keystore/Keychain criptografado)
 // (Fix 1 PII auditoria 2026-04-24): bt_last_password REMOVIDO. Antes era salvo
 // pra pre-preencher senha — risco de vazamento se Keystore for dumped. Agora
 // app usa refresh-token auto-login (useAuthStore.init valida/renova token
@@ -25,11 +26,13 @@ export default function LoginScreen({ navigation, route }) {
   const [pwdFocus, setPwdFocus] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [savePwd, setSavePwd] = useState(true); // opt-in "salvar senha"
   const { setToken, setUser } = useAuthStore();
 
   useEffect(() => {
-    // Pre-fill apenas o email (UX). Senha NAO eh persistida (Fix 1 PII).
+    // Pre-fill email sempre; senha só se o usuário optou por salvar.
     SecureStore.getItemAsync(EMAIL_KEY).then((e) => { if (e) setEmail(e); }).catch(() => {});
+    SecureStore.getItemAsync(PWD_KEY).then((p) => { if (p) { setPassword(p); setSavePwd(true); } }).catch(() => {});
   }, []);
 
   const emailInputRef = useRef(null);
@@ -81,8 +84,9 @@ export default function LoginScreen({ navigation, route }) {
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       await SecureStore.setItemAsync(EMAIL_KEY, email).catch(() => {});
-      // Senha NAO eh mais salva (Fix 1 PII). Auto-login no proximo open
-      // acontece via refresh-token em useAuthStore.init.
+      // Salvar senha (opt-in). SecureStore = Keystore/Keychain criptografado.
+      if (savePwd) await SecureStore.setItemAsync(PWD_KEY, password).catch(() => {});
+      else await SecureStore.deleteItemAsync(PWD_KEY).catch(() => {});
       if (refresh) await SecureStore.setItemAsync('bt_refresh_token', refresh).catch(() => {});
       // setToken persiste em SecureStore internamente (bt_token)
       await setToken(token);
@@ -214,6 +218,15 @@ export default function LoginScreen({ navigation, route }) {
           </TouchableOpacity>
         </View>
 
+        {mode === 'signin' && (
+          <TouchableOpacity style={styles.saveRow} activeOpacity={0.7} onPress={() => setSavePwd((s) => !s)}>
+            <View style={[styles.checkbox, savePwd && styles.checkboxOn]}>
+              {savePwd ? <Ionicons name="checkmark" size={14} color="#fff" /> : null}
+            </View>
+            <Text style={styles.saveLabel}>Salvar senha neste aparelho</Text>
+          </TouchableOpacity>
+        )}
+
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <TouchableOpacity activeOpacity={0.85} onPress={handleSubmit} disabled={loading} style={styles.btnWrap}>
@@ -236,6 +249,10 @@ export default function LoginScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
+  saveRow: { flexDirection: 'row', alignItems: 'center', marginTop: 14, marginBottom: 2 },
+  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  checkboxOn: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  saveLabel: { color: COLORS.textSecondary, fontSize: 13.5 },
   container: { flex: 1, padding: 24, justifyContent: 'center' },
   closeBtn: { position: 'absolute', top: 48, right: 20, zIndex: 10, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center' },
   logoWrap: { alignItems: 'center', marginBottom: 36 },
