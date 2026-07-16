@@ -3,6 +3,16 @@ export default {
           name: 'BlueTube',
           slug: 'bluetube',
           version: '1.5.0',
+          // OTA (EAS Update): fingerprint garante que um update JS so cai em
+          // builds nativos compativeis. Mudanca nativa (permissao/modulo novo)
+          // muda o fingerprint => exige AAB novo; ai o update nao cai em build
+          // antigo por engano. Polir features e funcoes JS = OTA instantaneo.
+          runtimeVersion: {
+                  policy: 'fingerprint',
+          },
+          updates: {
+                  url: 'https://u.expo.dev/c7a657a7-92a2-42ba-9cab-77a54a62077f',
+          },
           orientation: 'portrait',
           icon: './assets/icon.png',
           userInterfaceStyle: 'dark',
