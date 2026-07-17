@@ -195,8 +195,10 @@ export const blueAPI = {
 
     // Interacoes
     interact: async (type, video_id, extra = {}) => {
+          // token vai no corpo: like/unlike exigem identidade validada no
+          // backend (anti-spoof). view/share funcionam sem (visitante conta).
           const token = await getToken();
-          return api('blue-interact', { method: 'POST', body: JSON.stringify({ type, video_id, user_id: extra.user_id, session_id: extra.session_id || 'mobile', ...extra }) });
+          return api('blue-interact', { method: 'POST', body: JSON.stringify({ type, video_id, token, user_id: extra.user_id, session_id: extra.session_id || 'mobile', ...extra }) });
     },
     salvar: async (video_id) => {
           const token = await getToken();
