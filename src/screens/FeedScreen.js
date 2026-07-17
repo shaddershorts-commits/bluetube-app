@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Animated, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Animated, useWindowDimensions, DeviceEventEmitter } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useIsFocused } from '@react-navigation/native';
@@ -56,6 +56,16 @@ export default function FeedScreen() {
   }, [bannerOpacity]);
 
   useEffect(() => () => { if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current); }, []);
+
+  // Duplo-toque na aba Home: volta pro topo + recarrega o feed
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('bt-tab-reselect', (tab) => {
+      if (tab !== 'Feed') return;
+      try { listRef.current?.scrollToOffset({ offset: 0, animated: true }); } catch (e) {}
+      loadFeed(true);
+    });
+    return () => sub.remove();
+  }, [loadFeed]);
 
   useEffect(() => {
     // Popup de boas-vindas só pra usuário logado (guest cai direto no feed limpo)

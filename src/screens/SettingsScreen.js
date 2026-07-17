@@ -45,6 +45,41 @@ export default function SettingsScreen() {
   const [langModal, setLangModal] = useState(false);
   // Push toggle
   const [pushOn, setPushOn] = useState(false);
+  // Privacidade + tipo de conta (blue_profiles.is_private / account_type)
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [accountType, setAccountType] = useState('profissional');
+
+  useEffect(() => {
+    blueAPI.meuPerfil().then((r) => {
+      const p = r?.profile || r || {};
+      setIsPrivate(!!p.is_private);
+      if (p.account_type) setAccountType(p.account_type);
+    }).catch(() => {});
+  }, []);
+
+  const togglePrivate = async (v) => {
+    setIsPrivate(v);
+    const r = await blueAPI.atualizarPerfil({ is_private: v }).catch(() => null);
+    if (!r?.ok) { setIsPrivate(!v); Alert.alert('Não deu', 'Tenta de novo em alguns segundos.'); }
+  };
+
+  const escolherTipoConta = () => {
+    Alert.alert(
+      'Tipo de conta',
+      'Pessoal: versão simples — perfil pra conversar no BlueChat e assistir vídeos, sem insights, sem contagem de curtidas e sem monetização.\n\nProfissional: todas as ferramentas — analytics, curtidas visíveis e monetização.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: '👤 Pessoal', onPress: () => salvarTipo('pessoal') },
+        { text: '💼 Profissional', onPress: () => salvarTipo('profissional') },
+      ]
+    );
+  };
+  const salvarTipo = async (tipo) => {
+    const antes = accountType;
+    setAccountType(tipo);
+    const r = await blueAPI.atualizarPerfil({ account_type: tipo }).catch(() => null);
+    if (!r?.ok) { setAccountType(antes); Alert.alert('Não deu', 'Tenta de novo em alguns segundos.'); }
+  };
   // Mudar senha (modal em 3 passos: enviar código → código 60s → nova senha)
   const [pwdModal, setPwdModal] = useState(false);
   const [pwdStep, setPwdStep] = useState(1);
@@ -165,6 +200,26 @@ export default function SettingsScreen() {
             label={t('st_password')}
             value="Trocar com código por email"
             onPress={abrirPwdModal}
+          />
+          <View style={styles.row}>
+            <Ionicons name="lock-closed-outline" size={20} color={COLORS.text} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Perfil privado</Text>
+              <Text style={styles.value}>{isPrivate ? 'Só seguidores veem seus vídeos' : 'Qualquer pessoa vê seu perfil'}</Text>
+            </View>
+            <Switch value={isPrivate} onValueChange={togglePrivate} trackColor={{ true: COLORS.primary }} />
+          </View>
+          <SettingItem
+            icon={accountType === 'pessoal' ? 'person-outline' : 'briefcase-outline'}
+            label="Tipo de conta"
+            value={accountType === 'pessoal' ? 'Pessoal — simples, só chat e vídeos' : 'Profissional — insights e monetização'}
+            onPress={escolherTipoConta}
+          />
+          <SettingItem
+            icon="color-palette-outline"
+            label="Temas do BlueChat"
+            value="Cores, ícones, fontes e modo claro/escuro"
+            onPress={() => nav.navigate('Temas')}
           />
         </Section>
 

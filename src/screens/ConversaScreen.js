@@ -22,6 +22,7 @@ import { openModeration } from '../utils/moderation';
 import GlassMenu from '../components/GlassMenu';
 import ShareCard from '../components/ShareCard';
 import { COLORS } from '../constants';
+import { useChatTheme } from '../store/theme';
 
 function fmtDur(s) {
   if (!s || !isFinite(s)) return '0:00';
@@ -92,6 +93,19 @@ export default function ConversaScreen({ route }) {
   const isGrupo = !!grupo;
   const nav = useNavigation();
   const insets = useSafeAreaInsets();
+  // Tema do BlueChat (Configurações → Temas): overrides por cima dos styles fixos
+  const T = useChatTheme();
+  const ov = {
+    container: { backgroundColor: T.background },
+    header: { backgroundColor: T.surface, borderBottomColor: T.border },
+    mine: { backgroundColor: T.bubbleMe },
+    other: { backgroundColor: T.bubbleOther },
+    msgOther: { color: T.bubbleOtherText, fontFamily: T.font },
+    msgMine: { color: T.bubbleText, fontFamily: T.font },
+    inputBar: { backgroundColor: T.background, borderTopColor: T.border },
+    input: { backgroundColor: T.input, color: T.text, fontFamily: T.font },
+    sendBtn: { backgroundColor: T.accent },
+  };
   const [convId, setConvId] = useState(paramConvId || null);
   const [resolving, setResolving] = useState(initNewChat && !paramConvId);
   const [mensagens, setMensagens] = useState([]);
@@ -307,8 +321,8 @@ export default function ConversaScreen({ route }) {
 
   if (resolving) {
     return (
-      <View style={styles.container}>
-        <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
+      <View style={[styles.container, ov.container]}>
+        <View style={[styles.header, ov.header, { paddingTop: insets.top + 6 }]}>
           <TouchableOpacity onPress={() => nav.goBack()}><Ionicons name="chevron-back" size={26} color={COLORS.text} /></TouchableOpacity>
           <Text style={styles.headerName}>{headerTitle}</Text>
         </View>
@@ -324,14 +338,14 @@ export default function ConversaScreen({ route }) {
     const media = item.media_url ? { url: item.media_url, type: item.media_type, duration: item.media_duration } : null;
     if (item.deleted_for_all) {
       return (
-        <View style={[styles.bubble, mine ? styles.mine : styles.other]}>
+        <View style={[styles.bubble, mine ? [styles.mine, ov.mine] : [styles.other, ov.other]]}>
           <Text style={styles.msgApagada}>🚫 Mensagem apagada</Text>
         </View>
       );
     }
     return (
       <Pressable onLongPress={() => setMsgMenu(item)} delayLongPress={320}>
-      <View style={[styles.bubble, mine ? styles.mine : styles.other, media && styles.bubbleMedia]}>
+      <View style={[styles.bubble, mine ? [styles.mine, ov.mine] : [styles.other, ov.other], media && styles.bubbleMedia]}>
         {isGrupo && !mine && (
           <Text style={styles.autorNome}>@{item.autor?.username || 'membro'}</Text>
         )}
@@ -344,7 +358,7 @@ export default function ConversaScreen({ route }) {
         ) : media?.type === 'share' ? (
           <ShareCard videoId={media.url} />
         ) : null}
-        {body ? <Text style={[styles.msg, mine && { color: '#fff' }]}>{body}</Text> : null}
+        {body ? <Text style={[styles.msg, mine ? ov.msgMine : ov.msgOther]}>{body}</Text> : null}
         <View style={styles.tickRow}>
           {item.edited_at ? <Text style={styles.editada}>editada</Text> : null}
           {mine && !isGrupo ? <Ticks msg={item} /> : null}
@@ -355,9 +369,9 @@ export default function ConversaScreen({ route }) {
   };
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.container}>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[styles.container, ov.container]}>
       {/* Header estilo WhatsApp: avatar + nome + presença */}
-      <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
+      <View style={[styles.header, ov.header, { paddingTop: insets.top + 6 }]}>
         <TouchableOpacity onPress={() => nav.goBack()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Ionicons name="chevron-back" size={26} color={COLORS.text} />
         </TouchableOpacity>
@@ -425,12 +439,12 @@ export default function ConversaScreen({ route }) {
         </View>
       ) : null}
 
-      <View style={styles.inputBar}>
+      <View style={[styles.inputBar, ov.inputBar]}>
         <TouchableOpacity style={styles.iconBtn} onPress={() => { Keyboard.dismiss(); setShowEmoji((s) => !s); }}>
           <Ionicons name={showEmoji ? 'keypad-outline' : 'happy-outline'} size={24} color={COLORS.textSecondary} />
         </TouchableOpacity>
         <TextInput
-          style={styles.input}
+          style={[styles.input, ov.input]}
           placeholder="Mensagem…"
           placeholderTextColor={COLORS.textDim}
           value={texto}
@@ -443,11 +457,11 @@ export default function ConversaScreen({ route }) {
           <Ionicons name="image-outline" size={24} color={COLORS.textSecondary} />
         </TouchableOpacity>
         {texto.trim() ? (
-          <TouchableOpacity style={styles.sendBtn} onPress={enviar} disabled={enviando}>
+          <TouchableOpacity style={[styles.sendBtn, ov.sendBtn]} onPress={enviar} disabled={enviando}>
             {enviando ? <ActivityIndicator color="#fff" size="small" /> : <Ionicons name="send" color="#fff" size={18} />}
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity style={[styles.sendBtn, gravando && { backgroundColor: '#ef4444' }]} onPress={toggleGravar} disabled={enviando}>
+          <TouchableOpacity style={[styles.sendBtn, ov.sendBtn, gravando && { backgroundColor: '#ef4444' }]} onPress={toggleGravar} disabled={enviando}>
             {enviando ? <ActivityIndicator color="#fff" size="small" /> : <Ionicons name={gravando ? 'stop' : 'mic'} color="#fff" size={18} />}
           </TouchableOpacity>
         )}

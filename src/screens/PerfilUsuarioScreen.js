@@ -25,6 +25,7 @@ export default function PerfilUsuarioScreen({ route }) {
   const { width: W } = useWindowDimensions();
   const [profile, setProfile] = useState(null);
   const [videos, setVideos] = useState([]);
+  const [isPrivado, setIsPrivado] = useState(false); // perfil privado + eu não sigo
   const [loading, setLoading] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followBusy, setFollowBusy] = useState(false);
@@ -55,6 +56,7 @@ export default function PerfilUsuarioScreen({ route }) {
         ]);
         if (cancelled) return;
         setVideos((vr && vr.videos) || []);
+        setIsPrivado(!!vr?.private);
         setIsFollowing(!!fr?.following);
         setFollowerCount(p.seguidores || 0);
       } catch {}
@@ -161,7 +163,13 @@ export default function PerfilUsuarioScreen({ route }) {
         </View>
 
         <View style={[styles.grid, { padding: GAP, gap: GAP }]}>
-          {videos.length === 0 ? (
+          {isPrivado ? (
+            <View style={styles.empty}>
+              <Text style={styles.emptyIcon}>🔒</Text>
+              <Text style={styles.emptyText}>Este perfil é privado</Text>
+              <Text style={[styles.emptyText, { fontSize: 12, opacity: 0.6, marginTop: 4 }]}>Siga pra ver os vídeos</Text>
+            </View>
+          ) : videos.length === 0 ? (
             <View style={styles.empty}>
               <Text style={styles.emptyIcon}>🎬</Text>
               <Text style={styles.emptyText}>Nenhum vídeo ainda</Text>

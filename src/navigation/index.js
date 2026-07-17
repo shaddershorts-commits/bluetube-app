@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Linking as RNLinking, Image, View, StyleSheet } from 'react-native';
+import { Linking as RNLinking, Image, View, StyleSheet, DeviceEventEmitter } from 'react-native';
 import * as Linking from 'expo-linking';
 import { BlurView } from 'expo-blur';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
@@ -25,6 +25,7 @@ import ChatScreen from '../screens/ChatScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import ConversaScreen from '../screens/ConversaScreen';
 import GrupoInfoScreen from '../screens/GrupoInfoScreen';
+import TemasScreen from '../screens/TemasScreen';
 import PerfilUsuarioScreen from '../screens/PerfilUsuarioScreen';
 import ComentariosScreen from '../screens/ComentariosScreen';
 import LiveScreen from '../screens/LiveScreen';
@@ -170,8 +171,12 @@ function MainTabs() {
                       navigation.navigate('Login', { reason: route.name === 'Camera' ? 'postar' : route.name === 'Chat' ? 'conversar' : 'perfil' });
                       return;
                     }
-                    // Double-tap no icone da aba ATIVA recarregava a tela — bloqueia.
-                    if (navigation.isFocused()) e.preventDefault();
+                    // Toque na aba JÁ ATIVA = refresh controlado (estilo Instagram):
+                    // bloqueia a remontagem e avisa a tela pra voltar ao topo + recarregar.
+                    if (navigation.isFocused()) {
+                      e.preventDefault();
+                      DeviceEventEmitter.emit('bt-tab-reselect', route.name);
+                    }
                   },
         })}>
       <Tab.Screen name="Feed" component={FeedScreen} />
@@ -231,6 +236,7 @@ export default function Navigation() {
                        <Stack.Screen name="SetupPerfil" component={SetupPerfilScreen} />
                        <Stack.Screen name="Conversa" component={ConversaScreen} />
                        <Stack.Screen name="GrupoInfo" component={GrupoInfoScreen} />
+                       <Stack.Screen name="Temas" component={TemasScreen} />
                        <Stack.Screen name="PerfilUsuario" component={PerfilUsuarioScreen} />
                        <Stack.Screen name="Comentarios" component={ComentariosScreen} />
                        <Stack.Screen name="Live" component={LiveScreen} />

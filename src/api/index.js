@@ -402,7 +402,7 @@ export const blueAPI = {
     },
     // Cria story: sobe a midia direto pro bucket blue-stories (mesmo fluxo
     // do site) e registra via action=criar. tipo: 'imagem' | 'video'.
-    storyCriar: async (mediaUri, { tipo = 'imagem', duracao, mime } = {}) => {
+    storyCriar: async (mediaUri, { tipo = 'imagem', duracao, mime, audience } = {}) => {
           const token = await getToken();
           if (!token) return { error: 'Login necessario' };
           try {
@@ -424,15 +424,48 @@ export const blueAPI = {
                 const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/blue-stories/${pathStorage}`;
                 return api('blue-stories', {
                       method: 'POST',
-                      body: JSON.stringify({ action: 'criar', token, tipo, media_url: publicUrl, duracao: duracao || (tipo === 'video' ? 15 : 5) }),
+                      body: JSON.stringify({ action: 'criar', token, tipo, media_url: publicUrl, duracao: duracao || (tipo === 'video' ? 15 : 5), audience: audience || 'stories' }),
                 });
           } catch (e) {
                 return { error: e.message || 'Falha ao criar story' };
           }
     },
-    storiesFeed: async () => {
+    // Compartilhar vídeo do feed no story/status (sem upload — só referência)
+    storyCriarShare: async (video_id, audience) => {
           const token = await getToken();
-          return api(`blue-stories?action=feed&token=${encodeURIComponent(token)}`);
+          return api('blue-stories', { method: 'POST', body: JSON.stringify({ action: 'criar', token, tipo: 'video_share', video_id, audience: audience || 'stories' }) });
+    },
+    // feed: 'stories' (quem eu sigo — default) | 'status' (contatos do BlueChat)
+    storiesFeed: async (feed) => {
+          const token = await getToken();
+          return api(`blue-stories?action=feed&token=${encodeURIComponent(token)}${feed ? '&feed=' + feed : ''}`);
+    },
+    // Meus stories/status com viewers + reações (pra tela "quem viu")
+    storiesMeus: async () => {
+          const token = await getToken();
+          return api(`blue-stories?action=meus&token=${encodeURIComponent(token)}`);
+    },
+
+    // ── CONTATOS DO BLUECHAT (adicionar com aceite) ───────────────────────
+    contatoRequest: async (username) => {
+          const token = await getToken();
+          return api('blue-chat', { method: 'POST', body: JSON.stringify({ action: 'contato-request', token, username }) });
+    },
+    contatoRequests: async () => {
+          const token = await getToken();
+          return api(`blue-chat?action=contato-requests&token=${encodeURIComponent(token)}`);
+    },
+    contatoAccept: async (user_id) => {
+          const token = await getToken();
+          return api('blue-chat', { method: 'POST', body: JSON.stringify({ action: 'contato-accept', token, user_id }) });
+    },
+    contatoReject: async (user_id) => {
+          const token = await getToken();
+          return api('blue-chat', { method: 'POST', body: JSON.stringify({ action: 'contato-reject', token, user_id }) });
+    },
+    contatosList: async () => {
+          const token = await getToken();
+          return api(`blue-chat?action=contatos-list&token=${encodeURIComponent(token)}`);
     },
 
     // Onboarding
@@ -586,7 +619,7 @@ export const blueAPI = {
     //   username:     lowercase a-z0-9_. (sluggified no backend), min 3 chars
     //   avatar_data:  data:image/jpeg;base64,... (max 2MB). Backend faz upload
     //                 pro Supabase Storage e devolve avatar_url.
-    atualizarPerfil: async ({ display_name, bio, username, avatar_data, link_url, link_label } = {}) => {
+    atualizarPerfil: async ({ display_name, bio, username, avatar_data, link_url, link_label, is_private, account_type } = {}) => {
           const token = await getToken();
           if (!token) return { error: 'Login necessario' };
           return api('blue-profile', {
@@ -600,6 +633,8 @@ export const blueAPI = {
                       ...(avatar_data !== undefined && { avatar_data }),
                       ...(link_url !== undefined && { link_url }),
                       ...(link_label !== undefined && { link_label }),
+                      ...(is_private !== undefined && { is_private }),
+                      ...(account_type !== undefined && { account_type }),
                 }),
           });
     },

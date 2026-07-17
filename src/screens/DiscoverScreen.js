@@ -4,7 +4,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList, ScrollView,
-  RefreshControl, Image, useWindowDimensions, ActivityIndicator,
+  RefreshControl, Image, useWindowDimensions, ActivityIndicator, DeviceEventEmitter,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -59,6 +59,17 @@ export default function DiscoverScreen() {
 
   useEffect(() => { load(true); }, []);
 
+  // Duplo-toque na aba Explorar: topo + refresh
+  const gridRef = useRef(null);
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('bt-tab-reselect', (tab) => {
+      if (tab !== 'Descobrir') return;
+      try { gridRef.current?.scrollToOffset({ offset: 0, animated: true }); } catch (e) {}
+      load(true);
+    });
+    return () => sub.remove();
+  }, [load]);
+
   const loadMore = () => {
     if (loadingMore || loading || !hasMoreRef.current) return;
     setLoadingMore(true);
@@ -88,6 +99,7 @@ export default function DiscoverScreen() {
     <View style={{ flex: 1, backgroundColor: COLORS.background }}>
       <Header title={t('discover_title')} />
       <FlatList
+        ref={gridRef}
         data={videos}
         keyExtractor={(v) => v.id}
         renderItem={renderVideo}

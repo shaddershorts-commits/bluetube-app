@@ -7,6 +7,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Image, TextInput, Animated,
   KeyboardAvoidingView, Platform, PanResponder, ActivityIndicator, Alert,
+  Modal, Pressable, FlatList,
 } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -109,6 +110,30 @@ export default function StoryViewerScreen({ route, navigation }) {
     Toast.show({ type: r?.ok || r?.message ? 'success' : 'error', text1: r?.ok || r?.message ? '✓ Enviado' : 'Falhou, tenta de novo', visibilityTime: 1200 });
   };
 
+  // Vídeo do feed compartilhado no story/status: resolve dados pra renderizar
+  const [shareVideo, setShareVideo] = useState(null);
+  useEffect(() => {
+    setShareVideo(null);
+    if (story?.tipo === 'video_share' && story.video_id) {
+      blueAPI.videoInfo(story.video_id)
+        .then((d) => { if (d?.video) setShareVideo(d.video); })
+        .catch(() => {});
+    }
+  }, [story?.id]);
+
+  // Quem viu (só no MEU status): lista viewers + reações + respostas
+  const [viewersOpen, setViewersOpen] = useState(false);
+  const [viewersData, setViewersData] = useState(null); // null = carregando
+  const abrirViewers = async () => {
+    setViewersOpen(true);
+    setPaused(true);
+    setViewersData(null);
+    const r = await blueAPI.storiesMeus().catch(() => null);
+    const meu = (r?.stories || []).find((s) => s.id === story.id);
+    setViewersData(meu || { viewers: [], reacoes: {}, replies: [], visualizacoes: 0 });
+  };
+  const fecharViewers = () => { setViewersOpen(false); setPaused(false); };
+
   const handleDelete = () => {
     Alert.alert(t('st_delete_story'), t('st_sure'), [
       { text: t('st_cancel'), style: 'cancel' },
@@ -148,6 +173,24 @@ export default function StoryViewerScreen({ route, navigation }) {
             shouldPlay={!paused}
             isLooping={false}
           />
+        ) : story.tipo === 'video_share' ? (
+          <View style={styles.shareWrap}>
+            {shareVideo?.thumbnail_url ? (
+              <Image source={{ uri: shareVideo.thumbnail_url }} style={styles.shareThumb} resizeMode="cover" />
+            ) : (
+              <View style={[styles.shareThumb, styles.center]}><Text style={{ fontSize: 40 }}>🎬</Text></View>
+            )}
+            <Text style={styles.shareTitle} numberOfLines={2}>{shareVideo?.title || shareVideo?.titulo || 'Vídeo do Blue'}</Text>
+            <Text style={styles.shareCreator}>@{shareVideo?.creator?.username || 'criador'} · Blue</Text>
+            {shareVideo && (
+              <TouchableOpacity
+                style={styles.shareBtn}
+                onPress={() => navigation.navigate('Video', { videos: [shareVideo], startIndex: 0, mode: 'user', creator: shareVideo.creator })}>
+                <Ionicons name="play" size={16} color="#fff" />
+                <Text style={styles.shareBtnText}>Assistir no Blue</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         ) : story.media_url ? (
           <Image source={{ uri: story.media_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
         ) : (
@@ -196,6 +239,45 @@ export default function StoryViewerScreen({ route, navigation }) {
           <Ionicons name="close" size={28} color="#fff" />
         </TouchableOpacity>
       </View>
+
+      {/* Rodape do MEU status: quem viu */}
+      {isMine && (
+        <TouchableOpacity style={[styles.viewersBtn, { bottom: insets.bottom + 18 }]} onPress={abrirViewers}>
+          <Ionicons name="eye" size={16} color="#fff" />
+          <Text style={styles.viewersBtnText}>Ver quem viu</Text>
+        </TouchableOpacity>
+      )}
+
+      {/* Modal quem viu / curtiu / respondeu */}
+      <Modal visible={viewersOpen} transparent animationType="slide" onRequestClose={fecharViewers}>
+        <Pressable style={styles.vBackdrop} onPress={fecharViewers} />
+        <View style={styles.vSheet}>
+          <View style={styles.vHandle} />
+          <Text style={styles.vTitle}>
+            👁 {viewersData?.visualizacoes ?? '…'} visualizações
+            {viewersData && viewersData.total_reacoes ? `  ·  ${Object.entries(viewersData.reacoes || {}).map(([e, n]) => `${e}${n}`).join(' ')}` : ''}
+          </Text>
+          {!viewersData ? (
+            <ActivityIndicator color={COLORS.neon} style={{ marginVertical: 24 }} />
+          ) : (
+            <FlatList
+              data={viewersData.viewers || []}
+              keyExtractor={(v) => v.user_id}
+              style={{ maxHeight: 340 }}
+              ListEmptyComponent={<Text style={styles.vEmpty}>Ninguém viu ainda — seus contatos verão em breve. 👀</Text>}
+              renderItem={({ item }) => (
+                <View style={styles.vRow}>
+                  <Avatar uri={item.avatar_url} initial={item.username} size={38} />
+                  <Text style={styles.vName}>@{item.username}</Text>
+                </View>
+              )}
+            />
+          )}
+          {viewersData?.replies?.length ? (
+            <Text style={styles.vReplies}>💬 {viewersData.replies.length} resposta{viewersData.replies.length > 1 ? 's' : ''} — chegaram no seu BlueChat</Text>
+          ) : null}
+        </View>
+      </Modal>
 
       {/* Rodape: reacoes + reply (stories dos outros) */}
       {!isMine && (
@@ -253,4 +335,22 @@ const styles = StyleSheet.create({
     width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.neon,
     alignItems: 'center', justifyContent: 'center',
   },
+  // Vídeo compartilhado no story/status
+  shareWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28, gap: 12 },
+  shareThumb: { width: '82%', aspectRatio: 9 / 14, borderRadius: 18, backgroundColor: '#0a1628' },
+  shareTitle: { color: '#fff', fontSize: 17, fontWeight: '800', textAlign: 'center', lineHeight: 23 },
+  shareCreator: { color: 'rgba(255,255,255,0.55)', fontSize: 12 },
+  shareBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: COLORS.primary, borderRadius: 100, paddingHorizontal: 22, paddingVertical: 12, marginTop: 4 },
+  shareBtnText: { color: '#fff', fontSize: 14, fontWeight: '800' },
+  // Quem viu (meu status)
+  viewersBtn: { position: 'absolute', alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 100, paddingHorizontal: 18, paddingVertical: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)' },
+  viewersBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  vBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
+  vSheet: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: '#0a1020', borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 16, paddingBottom: 34 },
+  vHandle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.25)', marginBottom: 12 },
+  vTitle: { color: '#fff', fontSize: 15, fontWeight: '800', marginBottom: 12 },
+  vRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
+  vName: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  vEmpty: { color: 'rgba(255,255,255,0.5)', fontSize: 13, textAlign: 'center', paddingVertical: 20 },
+  vReplies: { color: COLORS.neon, fontSize: 12, fontWeight: '700', marginTop: 10, textAlign: 'center' },
 });

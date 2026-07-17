@@ -1,7 +1,8 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator,
   RefreshControl, Alert, Image, Modal, Pressable, Linking, Share, useWindowDimensions,
+  DeviceEventEmitter,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -50,6 +51,7 @@ export default function ProfileScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [sortMode, setSortMode] = useState('recent');
   const [menuOpen, setMenuOpen] = useState(false);
+  const scrollRef = useRef(null);
 
   const load = useCallback(async () => {
     try {
@@ -67,6 +69,16 @@ export default function ProfileScreen() {
   }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  // Duplo-toque na aba Perfil: topo + refresh
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('bt-tab-reselect', (tab) => {
+      if (tab !== 'Perfil') return;
+      try { scrollRef.current?.scrollTo({ y: 0, animated: true }); } catch (e) {}
+      load();
+    });
+    return () => sub.remove();
+  }, [load]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -149,6 +161,7 @@ export default function ProfileScreen() {
       </View>
 
       <ScrollView
+        ref={scrollRef}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.neon} />}
         contentContainerStyle={{ paddingBottom: 80 }}>
 
@@ -168,7 +181,7 @@ export default function ProfileScreen() {
             <Stat value={videos.length} label="Vídeos" />
             <Stat value={profile?.seguindo || 0} label="Seguindo" />
             <Stat value={profile?.seguidores || 0} label="Seguidores" />
-            <Stat value={totalLikes} label="Curtidas" />
+            {profile?.account_type !== 'pessoal' && <Stat value={totalLikes} label="Curtidas" />}
           </View>
 
           {profile?.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
@@ -245,16 +258,21 @@ export default function ProfileScreen() {
             <MenuItem icon="person-outline" label="Editar perfil" onPress={() => { setMenuOpen(false); nav.navigate('EditProfile'); }} />
             <MenuItem icon="bookmark-outline" label="Salvos" onPress={() => { setMenuOpen(false); nav.navigate('Saved'); }} />
             <MenuItem icon="notifications-outline" label="Notificações" onPress={() => { setMenuOpen(false); nav.navigate('Notifications'); }} />
-            <MenuItem
-              icon="analytics-outline"
-              label="Analytics"
-              onPress={() => { setMenuOpen(false); nav.navigate('Analytics'); }}
-            />
-            <MenuItem
-              icon="cash-outline"
-              label={stats?.tem_conta ? `Monetização — R$${(stats.saldo_disponivel || 0).toFixed(2)}` : 'Monetização'}
-              onPress={() => { setMenuOpen(false); nav.navigate('Monetizacao'); }}
-            />
+            {/* Conta Pessoal = simples: sem insights nem monetização (Configurações → Tipo de conta) */}
+            {profile?.account_type !== 'pessoal' && (
+              <MenuItem
+                icon="analytics-outline"
+                label="Analytics"
+                onPress={() => { setMenuOpen(false); nav.navigate('Analytics'); }}
+              />
+            )}
+            {profile?.account_type !== 'pessoal' && (
+              <MenuItem
+                icon="cash-outline"
+                label={stats?.tem_conta ? `Monetização — R$${(stats.saldo_disponivel || 0).toFixed(2)}` : 'Monetização'}
+                onPress={() => { setMenuOpen(false); nav.navigate('Monetizacao'); }}
+              />
+            )}
             <MenuItem icon="settings-outline" label="Configurações" onPress={() => { setMenuOpen(false); nav.navigate('Settings'); }} />
             <MenuItem icon="share-social-outline" label="Compartilhar perfil" onPress={handleSharePerfil} />
             <View style={styles.menuDivider} />
