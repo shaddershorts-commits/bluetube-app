@@ -17,7 +17,7 @@ import Toast from 'react-native-toast-message';
 import Avatar from '../components/Avatar';
 import blueAPI from '../api';
 import { useAuthStore } from '../store';
-import { COLORS } from '../constants';
+import { COLORS_DARK as COLORS } from '../constants';
 import { useT } from '../i18n';
 
 const EMOJIS = ['❤️', '🔥', '😂', '😮', '😢', '👏', '🤯'];

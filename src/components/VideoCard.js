@@ -9,7 +9,7 @@ import * as Haptics from 'expo-haptics';
 import { useFeedStore, useAuthStore } from '../store';
 import { requireAuth } from '../utils/requireAuth';
 import { openModeration } from '../utils/moderation';
-import { COLORS } from '../constants';
+import { COLORS_DARK as COLORS } from '../constants';
 import Avatar from './Avatar';
 import ActionButton from './ActionButton';
 import ShareSheet from './ShareSheet';
@@ -59,6 +59,7 @@ export default function VideoCard({ video, index, cardHeight, activeOverride }) 
   const [liked, setLiked] = useState(video.liked === true);
   const [saved, setSaved] = useState(video.saved === true);
   const [likes, setLikes] = useState(video.likes || 0);
+  const [shares, setShares] = useState(video.shares || 0);
   const [rate2x, setRate2x] = useState(false);
   const [fitMode, setFitMode] = useState(() => pickResizeMode(video.width, video.height));
   const [shareOpen, setShareOpen] = useState(false);
@@ -157,6 +158,13 @@ export default function VideoCard({ video, index, cardHeight, activeOverride }) 
     await blueAPI.salvar(video.id).catch(() => {});
   };
 
+  // Cada compartilhamento real (chat, status, stories, externo) conta no
+  // insight do criador e no número embaixo do botão (estilo TikTok).
+  const registrarShare = () => {
+    setShares((n) => n + 1);
+    blueAPI.interact('share', video.id, { user_id: user?.id, session_id: SESSION_ID }).catch(() => {});
+  };
+
   const handleShare = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     // Logado: sheet interno (pessoas que mais conversa) + externo.
@@ -164,9 +172,10 @@ export default function VideoCard({ video, index, cardHeight, activeOverride }) 
     const { token } = require('../store').useAuthStore.getState();
     if (token) { setShareOpen(true); return; }
     try {
-      await Share.share({
+      const r = await Share.share({
         message: `${video.title || 'Vídeo no Blue'} — https://bluetubeviral.com/blue-video.html?v=${video.id}`,
       });
+      if (r?.action !== Share.dismissedAction) registrarShare();
     } catch {}
   };
 
@@ -290,7 +299,7 @@ export default function VideoCard({ video, index, cardHeight, activeOverride }) 
         <ActionButton icon={liked ? 'heart' : 'heart-outline'} count={likes} onPress={() => handleLike(false)} active={liked} color={COLORS.red} />
         <ActionButton icon="chatbubble-outline" count={video.comments} onPress={() => { if (requireAuth(nav, 'comentar')) nav.navigate('Comentarios', { video_id: video.id }); }} />
         <ActionButton icon={saved ? 'bookmark' : 'bookmark-outline'} count={video.saves} onPress={handleSave} active={saved} color={COLORS.neon} />
-        <ActionButton icon="paper-plane-outline" onPress={handleShare} />
+        <ActionButton icon="paper-plane-outline" count={shares} onPress={handleShare} />
         <ActionButton icon="ellipsis-horizontal" onPress={() => openModeration(nav, { tipoAlvo: 'video', alvoId: video.id, userId: video.user_id, username: video.creator?.username || video.username })} />
       </View>
 
@@ -311,7 +320,7 @@ export default function VideoCard({ video, index, cardHeight, activeOverride }) 
       )}
 
       {/* Compartilhar dentro do Blue (pessoas/grupos que mais conversa) */}
-      <ShareSheet visible={shareOpen} video={video} onClose={() => setShareOpen(false)} />
+      <ShareSheet visible={shareOpen} video={video} onClose={() => setShareOpen(false)} onShared={registrarShare} />
     </View>
   );
 }

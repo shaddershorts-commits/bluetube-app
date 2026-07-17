@@ -1,6 +1,6 @@
 import { TouchableOpacity, Text, View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../constants';
+import { COLORS_DARK as COLORS } from '../constants';
 
 function fmt(n) {
   n = parseInt(n) || 0;

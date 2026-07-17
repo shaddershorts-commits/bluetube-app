@@ -9,7 +9,7 @@ import { useNavigation, useIsFocused } from '@react-navigation/native';
 import Avatar from './Avatar';
 import blueAPI from '../api';
 import { useFeedStore } from '../store';
-import { COLORS } from '../constants';
+import { COLORS_DARK as COLORS } from '../constants';
 
 export default function StoriesBar() {
   const nav = useNavigation();

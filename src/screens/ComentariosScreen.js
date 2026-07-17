@@ -16,7 +16,7 @@ import blueAPI from '../api';
 import { useAuthStore } from '../store';
 import { requireAuth } from '../utils/requireAuth';
 import { openModeration } from '../utils/moderation';
-import { COLORS } from '../constants';
+import { COLORS_DARK as COLORS } from '../constants';
 
 function ago(iso) {
   if (!iso) return '';

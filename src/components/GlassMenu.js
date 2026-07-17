@@ -12,7 +12,7 @@ export default function GlassMenu({ visible, title, subtitle, options = [], onCl
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.sheetWrap} onPress={(e) => e.stopPropagation()}>
-          <BlurView intensity={50} tint="dark" style={styles.sheet}>
+          <BlurView intensity={50} tint={COLORS.mode === 'light' ? 'light' : 'dark'} style={styles.sheet}>
             <View style={styles.handle} />
             {title ? <Text style={styles.title} numberOfLines={1}>{title}</Text> : null}
             {subtitle ? <Text style={styles.subtitle} numberOfLines={2}>{subtitle}</Text> : null}
@@ -45,8 +45,8 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(0,170,255,0.25)',
     backgroundColor: 'rgba(10,22,40,0.55)',
   },
-  handle: { width: 42, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.25)', alignSelf: 'center', marginTop: 10 },
-  title: { color: '#fff', fontSize: 15, fontWeight: '800', textAlign: 'center', marginTop: 10, paddingHorizontal: 20 },
+  handle: { width: 42, height: 4, borderRadius: 2, backgroundColor: COLORS.textDim, alignSelf: 'center', marginTop: 10 },
+  title: { color: COLORS.text, fontSize: 15, fontWeight: '800', textAlign: 'center', marginTop: 10, paddingHorizontal: 20 },
   subtitle: { color: COLORS.textDim, fontSize: 11.5, textAlign: 'center', marginTop: 2, paddingHorizontal: 20 },
   opt: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 15, paddingHorizontal: 22, marginTop: 4 },
   optBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(255,255,255,0.08)' },

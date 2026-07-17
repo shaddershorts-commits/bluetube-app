@@ -1,9 +1,12 @@
 import Constants from 'expo-constants';
 
-// COLORS legado — mantido pra retrocompat com componentes antigos.
-// Novos componentes devem usar `import { colors, space, radius, blur } from './theme'`.
-// Veja src/constants/theme.js (Lote 8 — Liquid Glass design system).
-export const COLORS = {
+// COLORS — paleta GLOBAL dinâmica (claro/escuro).
+// App.js chama applyMode() com a preferência salva ANTES de importar as telas,
+// então os StyleSheet.create de todo o app capturam a paleta certa.
+// Trocar o modo em runtime = salvar preferência + reload do JS (TemasScreen).
+// Telas de vídeo (feed/player/stories/câmera/live) importam COLORS_DARK:
+// player vertical é sempre escuro (texto branco sobre vídeo).
+const DARK = {
   background: '#020817',
   surface: '#0a1628',
   primary: '#1a6bff',
@@ -17,7 +20,26 @@ export const COLORS = {
   success: '#22c55e',
   gold: '#FFD700',
   red: '#ef4444',
+  mode: 'dark',
 };
+const LIGHT = {
+  ...DARK,
+  background: '#eef3fa',
+  surface: '#ffffff',
+  neon: '#1a6bff',
+  text: '#0b1526',
+  textSecondary: 'rgba(11,21,38,0.6)',
+  textDim: 'rgba(11,21,38,0.38)',
+  border: 'rgba(26,107,255,0.22)',
+  mode: 'light',
+};
+
+export const COLORS = { ...DARK };
+export const COLORS_DARK = Object.freeze({ ...DARK });
+export function applyMode(mode) {
+  const alvo = mode === 'light' ? LIGHT : DARK;
+  for (const k of Object.keys(alvo)) COLORS[k] = alvo[k];
+}
 
 // Re-export do theme novo pra conveniencia (import unico):
 export * from './theme';

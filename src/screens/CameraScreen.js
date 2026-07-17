@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
-import { COLORS } from '../constants';
+import { COLORS_DARK as COLORS } from '../constants';
 
 export default function CameraScreen() {
   const nav = useNavigation();

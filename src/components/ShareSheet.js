@@ -7,9 +7,9 @@ import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import Avatar from './Avatar';
 import blueAPI from '../api';
-import { COLORS } from '../constants';
+import { COLORS_DARK as COLORS } from '../constants';
 
-export default function ShareSheet({ visible, video, onClose }) {
+export default function ShareSheet({ visible, video, onClose, onShared }) {
   const [chats, setChats] = useState(null);
   const [sentTo, setSentTo] = useState({}); // id -> true (feedback "enviado ✓")
   const [postado, setPostado] = useState({}); // stories|status -> 'sending'|true
@@ -25,7 +25,9 @@ export default function ShareSheet({ visible, video, onClose }) {
     if (postado[audience]) return;
     setPostado((p) => ({ ...p, [audience]: 'sending' }));
     const r = await blueAPI.storyCriarShare(video.id, audience).catch(() => null);
-    setPostado((p) => ({ ...p, [audience]: r?.ok || r?.story ? true : undefined }));
+    const deuCerto = r?.ok || r?.story;
+    setPostado((p) => ({ ...p, [audience]: deuCerto ? true : undefined }));
+    if (deuCerto && onShared) onShared();
   };
 
   const enviarPara = async (chat) => {
@@ -36,6 +38,7 @@ export default function ShareSheet({ visible, video, onClose }) {
       if (chat.type === 'grupo') await blueAPI.grupoEnviar(chat.id, '', media);
       else await blueAPI.enviarMensagem(null, '', chat.id, media);
       setSentTo((s) => ({ ...s, [chat.type + chat.id]: true }));
+      if (onShared) onShared();
     } catch (e) {
       setSentTo((s) => { const n = { ...s }; delete n[chat.type + chat.id]; return n; });
     }
@@ -44,7 +47,8 @@ export default function ShareSheet({ visible, video, onClose }) {
   const shareExterno = async () => {
     onClose();
     try {
-      await Share.share({ message: `${video.title || 'Vídeo no Blue'} — https://bluetubeviral.com/blue-video.html?v=${video.id}` });
+      const r = await Share.share({ message: `${video.title || 'Vídeo no Blue'} — https://bluetubeviral.com/blue-video.html?v=${video.id}` });
+      if (r?.action !== Share.dismissedAction && onShared) onShared();
     } catch {}
   };
 

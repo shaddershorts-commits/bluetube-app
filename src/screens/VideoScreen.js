@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import VideoCard from '../components/VideoCard';
 import blueAPI from '../api';
-import { COLORS } from '../constants';
+import { COLORS_DARK as COLORS } from '../constants';
 import { useT } from '../i18n';
 
 export default function VideoScreen({ route, navigation }) {

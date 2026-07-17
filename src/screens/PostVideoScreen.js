@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import blueAPI from '../api';
-import { COLORS } from '../constants';
+import { COLORS_DARK as COLORS } from '../constants';
 
 const MAX_TITLE = 100;
 const MAX_DESC = 500;

@@ -5,7 +5,7 @@ import { View, Text, TouchableOpacity, Image, StyleSheet, ActivityIndicator } fr
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import blueAPI from '../api';
-import { COLORS } from '../constants';
+import { COLORS_DARK as COLORS } from '../constants';
 
 const cache = {}; // videoId -> video (evita refetch a cada render)
 

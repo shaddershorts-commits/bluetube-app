@@ -26,6 +26,7 @@ import ProfileScreen from '../screens/ProfileScreen';
 import ConversaScreen from '../screens/ConversaScreen';
 import GrupoInfoScreen from '../screens/GrupoInfoScreen';
 import TemasScreen from '../screens/TemasScreen';
+import AtividadeScreen from '../screens/AtividadeScreen';
 import PerfilUsuarioScreen from '../screens/PerfilUsuarioScreen';
 import ComentariosScreen from '../screens/ComentariosScreen';
 import LiveScreen from '../screens/LiveScreen';
@@ -149,13 +150,13 @@ function MainTabs() {
                   tabBarItemStyle: { height: 54, justifyContent: 'center', alignItems: 'center', paddingTop: 0, paddingBottom: 0 },
                   tabBarShowLabel: false,
                   tabBarBackground: () => (
-                              <View style={[StyleSheet.absoluteFill, { borderRadius: 27, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)' }]}>
+                              <View style={[StyleSheet.absoluteFill, { borderRadius: 27, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.mode === 'light' ? 'rgba(26,107,255,0.25)' : 'rgba(255,255,255,0.16)' }]}>
                                 <BlurView intensity={95} tint="light" style={StyleSheet.absoluteFill} />
-                                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(90,130,190,0.22)' }]} />
+                                <View style={[StyleSheet.absoluteFill, { backgroundColor: COLORS.mode === 'light' ? 'rgba(255,255,255,0.72)' : 'rgba(90,130,190,0.22)' }]} />
                               </View>
                   ),
-                  tabBarActiveTintColor: COLORS.neon,
-                  tabBarInactiveTintColor: 'rgba(255,255,255,0.75)',
+                  tabBarActiveTintColor: COLORS.mode === 'light' ? '#1a6bff' : COLORS.neon,
+                  tabBarInactiveTintColor: COLORS.mode === 'light' ? 'rgba(11,21,38,0.55)' : 'rgba(255,255,255,0.75)',
                   tabBarIcon: ({ color, focused }) => {
                               if (route.name === 'Perfil') return <PerfilTabIcon color={color} focused={focused} />;
                               const icons = { Feed: 'home', Descobrir: 'search', Camera: 'add-circle', Chat: 'chatbubble' };
@@ -237,6 +238,7 @@ export default function Navigation() {
                        <Stack.Screen name="Conversa" component={ConversaScreen} />
                        <Stack.Screen name="GrupoInfo" component={GrupoInfoScreen} />
                        <Stack.Screen name="Temas" component={TemasScreen} />
+                       <Stack.Screen name="Atividade" component={AtividadeScreen} />
                        <Stack.Screen name="PerfilUsuario" component={PerfilUsuarioScreen} />
                        <Stack.Screen name="Comentarios" component={ComentariosScreen} />
                        <Stack.Screen name="Live" component={LiveScreen} />

@@ -1,16 +1,35 @@
 // Temas do BlueChat: escolha de estilo (cor + ícones + fonte) com preview de
 // bolhas, e modo Claro/Escuro das superfícies de conversa/configurações.
 // O feed de vídeo permanece escuro (padrão de players verticais).
-import { useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { useMemo, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, DevSettings } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Updates from 'expo-updates';
 import Header from '../components/Header';
 import { CHAT_THEMES, MODES, useThemeStore, useChatTheme, themedIcon } from '../store/theme';
+import { applyMode } from '../constants';
 
 export default function TemasScreen() {
   const T = useChatTheme();
   const { chatTheme, mode, setChatTheme, setMode } = useThemeStore();
   const styles = useMemo(() => mkStyles(T), [T]);
+  const [reloading, setReloading] = useState(false);
+
+  // Modo claro/escuro é GLOBAL: os estilos do app inteiro são criados na
+  // abertura, então trocar exige salvar a preferência e reiniciar o JS (~1s).
+  const trocarModo = async (m) => {
+    if (m === mode || reloading) return;
+    setMode(m);          // persiste em SecureStore (bt_app_mode)
+    applyMode(m);        // paleta global pro que renderizar até o reload
+    setReloading(true);
+    setTimeout(async () => {
+      try { await Updates.reloadAsync(); }
+      catch (e) {
+        try { DevSettings.reload(); }
+        catch (e2) { setReloading(false); Alert.alert('Quase lá', 'Fecha e abre o app pra aplicar o tema.'); }
+      }
+    }, 350);
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: T.background }}>
@@ -24,12 +43,15 @@ export default function TemasScreen() {
             <TouchableOpacity
               key={m}
               style={[styles.modeBtn, mode === m && styles.modeBtnOn]}
-              onPress={() => setMode(m)}>
-              <Text style={[styles.modeText, mode === m && { color: T.accent, fontWeight: '800' }]}>{label}</Text>
+              onPress={() => trocarModo(m)}
+              disabled={reloading}>
+              {reloading && mode === m
+                ? <ActivityIndicator size="small" color={T.accent} />
+                : <Text style={[styles.modeText, mode === m && { color: T.accent, fontWeight: '800' }]}>{label}</Text>}
             </TouchableOpacity>
           ))}
         </View>
-        <Text style={styles.hint}>O modo claro vale pro BlueChat e Configurações. O feed de vídeos continua escuro, como todo player vertical.</Text>
+        <Text style={styles.hint}>Vale pro app todo — o app reinicia em ~1s pra aplicar. O feed de vídeos continua escuro, como todo player vertical.</Text>
 
         {/* Estilos */}
         <Text style={styles.section}>Estilo do BlueChat</Text>

@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Header from '../components/Header';
-import { COLORS } from '../constants';
+import { COLORS_DARK as COLORS } from '../constants';
 
 export default function LiveScreen({ route }) {
   const { live_id } = route.params || {};

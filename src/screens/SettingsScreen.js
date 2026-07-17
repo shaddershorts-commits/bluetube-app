@@ -217,9 +217,15 @@ export default function SettingsScreen() {
           />
           <SettingItem
             icon="color-palette-outline"
-            label="Temas do BlueChat"
-            value="Cores, ícones, fontes e modo claro/escuro"
+            label="Temas"
+            value="Estilos do BlueChat + modo claro/escuro do app"
             onPress={() => nav.navigate('Temas')}
+          />
+          <SettingItem
+            icon="heart-outline"
+            label="Sua atividade"
+            value="Todos os posts que você curtiu"
+            onPress={() => nav.navigate('Atividade')}
           />
         </Section>
 

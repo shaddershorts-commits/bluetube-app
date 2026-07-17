@@ -99,7 +99,7 @@ export default function AddContactSheet({ visible, onClose, onChanged }) {
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
       <View style={styles.sheetWrap}>
-        <BlurView intensity={50} tint="dark" style={styles.sheet}>
+        <BlurView intensity={50} tint={COLORS.mode === 'light' ? 'light' : 'dark'} style={styles.sheet}>
           <View style={styles.handle} />
           <Text style={styles.title}>Adicionar usuário</Text>
 
@@ -140,10 +140,10 @@ export default function AddContactSheet({ visible, onClose, onChanged }) {
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
   sheetWrap: { position: 'absolute', left: 0, right: 0, bottom: 0, maxHeight: '78%', borderTopLeftRadius: 22, borderTopRightRadius: 22, overflow: 'hidden' },
-  sheet: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12, backgroundColor: 'rgba(4,11,26,0.9)' },
-  handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.25)', marginBottom: 12 },
+  sheet: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12, backgroundColor: COLORS.mode === 'light' ? 'rgba(255,255,255,0.92)' : 'rgba(4,11,26,0.9)' },
+  handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: COLORS.textDim, marginBottom: 12 },
   title: { color: COLORS.text, fontSize: 17, fontWeight: '800', marginBottom: 12 },
-  searchWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 12, paddingLeft: 12, paddingRight: 6, marginBottom: 12, borderWidth: 1, borderColor: COLORS.border },
+  searchWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: COLORS.mode === 'light' ? 'rgba(11,21,38,0.05)' : 'rgba(255,255,255,0.06)', borderRadius: 12, paddingLeft: 12, paddingRight: 6, marginBottom: 12, borderWidth: 1, borderColor: COLORS.border },
   searchInput: { flex: 1, paddingVertical: 10, color: COLORS.text, fontSize: 14 },
   sendBtn: { backgroundColor: COLORS.primary, borderRadius: 10, width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   section: { color: COLORS.textDim, fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginTop: 12, marginBottom: 6 },
@@ -151,6 +151,6 @@ const styles = StyleSheet.create({
   nome: { color: COLORS.text, fontSize: 14, fontWeight: '700' },
   sub: { color: COLORS.textSecondary, fontSize: 12 },
   btnOk: { backgroundColor: COLORS.success, borderRadius: 18, width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
-  btnNo: { backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 18, width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
+  btnNo: { backgroundColor: COLORS.mode === 'light' ? 'rgba(11,21,38,0.08)' : 'rgba(255,255,255,0.08)', borderRadius: 18, width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   empty: { color: COLORS.textSecondary, fontSize: 13, textAlign: 'center', marginTop: 24, lineHeight: 20 },
 });

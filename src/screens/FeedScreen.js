@@ -9,7 +9,7 @@ import VideoCard from '../components/VideoCard';
 import LivesBar from '../components/LivesBar';
 import PopupBoasVindas from '../components/PopupBoasVindas';
 import blueAPI from '../api';
-import { COLORS } from '../constants';
+import { COLORS_DARK as COLORS } from '../constants';
 
 let _popupShownThisSession = false;
 

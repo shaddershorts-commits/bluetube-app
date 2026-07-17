@@ -463,6 +463,11 @@ export const blueAPI = {
           const token = await getToken();
           return api('blue-chat', { method: 'POST', body: JSON.stringify({ action: 'contato-reject', token, user_id }) });
     },
+    // Sua atividade: vídeos que eu curti
+    minhasCurtidas: async () => {
+          const token = await getToken();
+          return api(`blue-profile?action=my-likes&token=${encodeURIComponent(token)}`);
+    },
     contatosList: async () => {
           const token = await getToken();
           return api(`blue-chat?action=contatos-list&token=${encodeURIComponent(token)}`);

@@ -79,6 +79,7 @@ export default function AnalyticsScreen() {
         <View style={styles.cardsRow}>
           <StatCard icon="bookmark-outline"  color="#f59e0b" label="Saves"          value={formatCount(s.total_saves || 0)} />
           <StatCard icon="chatbubble-outline" color="#10b981" label="Comentários"   value={formatCount(s.total_comments || 0)} />
+          <StatCard icon="paper-plane-outline" color="#00c4ff" label="Compartilhamentos" value={formatCount(s.total_shares || 0)} />
         </View>
         <View style={styles.cardsRow}>
           <StatCard icon="film-outline"      color={COLORS.neon} label="Vídeos publicados" value={formatCount(s.video_count || 0)} />
