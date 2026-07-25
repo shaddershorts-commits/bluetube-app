@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, FlatList, ActivityIndicator,
   RefreshControl, Alert, Image, Modal, Pressable, Linking, Share, useWindowDimensions,
   DeviceEventEmitter,
 } from 'react-native';
@@ -74,7 +74,7 @@ export default function ProfileScreen() {
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener('bt-tab-reselect', (tab) => {
       if (tab !== 'Perfil') return;
-      try { scrollRef.current?.scrollTo({ y: 0, animated: true }); } catch (e) {}
+      try { scrollRef.current?.scrollToOffset({ offset: 0, animated: true }); } catch (e) {}
       load();
     });
     return () => sub.remove();
@@ -120,14 +120,14 @@ export default function ProfileScreen() {
       const res = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.All,
         quality: 0.85,
-        videoMaxDuration: 15,
+        videoMaxDuration: 180, // stories até 3 min (user 2026-07-24)
       });
       if (res.canceled || !res.assets?.length) return;
       const asset = res.assets[0];
       const isVideo = asset.type === 'video';
       const r = await blueAPI.storyCriar(asset.uri, {
         tipo: isVideo ? 'video' : 'imagem',
-        duracao: isVideo ? Math.min(15, Math.round((asset.duration || 15000) / 1000)) : 5,
+        duracao: isVideo ? Math.min(180, Math.round((asset.duration || 15000) / 1000)) : 5,
         mime: isVideo ? 'video/mp4' : 'image/jpeg',
       });
       if (r?.ok || r?.story) Alert.alert('✓ Story publicado!', 'Ele fica no ar por 24 horas.');
@@ -160,10 +160,41 @@ export default function ProfileScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView
+      {/* PERF (user 2026-07-24, "perfil travando"): era ScrollView + .map() —
+          TODOS os thumbnails montados de uma vez (sem virtualização) = jank.
+          Agora FlatList 3 colunas virtualizada; header/sort viram
+          ListHeaderComponent. */}
+      <FlatList
         ref={scrollRef}
+        data={sortedVideos}
+        keyExtractor={(v) => String(v.id)}
+        numColumns={3}
+        columnWrapperStyle={{ gap: GAP, paddingHorizontal: GAP }}
+        contentContainerStyle={{ paddingBottom: 80, gap: GAP }}
+        initialNumToRender={9}
+        maxToRenderPerBatch={9}
+        windowSize={7}
+        removeClippedSubviews
+        renderItem={({ item: v, index }) => (
+          <GridCard
+            video={v}
+            width={cardW}
+            height={cardH}
+            onPress={() => nav.navigate('Video', { videos, startIndex: videos.indexOf(v), mode: 'user', creator: profile })}
+          />
+        )}
+        ListEmptyComponent={
+          <View style={styles.empty}>
+            <Text style={styles.emptyIcon}>🎬</Text>
+            <Text style={styles.emptyText}>Nenhum vídeo ainda</Text>
+            <Text style={styles.emptyHint}>Os vídeos que você postar aparecem aqui</Text>
+          </View>
+        }
+        ListFooterComponent={
+          <Text style={styles.appVersion}>Blue v{Constants.expoConfig?.version || '1.5.0'}</Text>
+        }
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.neon} />}
-        contentContainerStyle={{ paddingBottom: 80 }}>
+        ListHeaderComponent={<View>
 
         {/* Header estilo TikTok: avatar + stats inline */}
         <View style={styles.header}>
@@ -223,29 +254,8 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Grid de videos */}
-        <View style={[styles.grid, { padding: GAP, gap: GAP }]}>
-          {sortedVideos.length === 0 ? (
-            <View style={styles.empty}>
-              <Text style={styles.emptyIcon}>🎬</Text>
-              <Text style={styles.emptyText}>Nenhum vídeo ainda</Text>
-              <Text style={styles.emptyHint}>Os vídeos que você postar aparecem aqui</Text>
-            </View>
-          ) : (
-            sortedVideos.map((v) => (
-              <GridCard
-                key={v.id}
-                video={v}
-                width={cardW}
-                height={cardH}
-                onPress={() => nav.navigate('Video', { videos, startIndex: videos.indexOf(v), mode: 'user', creator: profile })}
-              />
-            ))
-          )}
-        </View>
-        {/* Versão do app — também serve de marcador visível de update OTA */}
-        <Text style={styles.appVersion}>Blue v{Constants.expoConfig?.version || '1.5.0'}</Text>
-      </ScrollView>
+        </View>}
+      />
 
       {/* Menu hamburger (bottom sheet) — Liquid Glass */}
       <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
@@ -293,7 +303,7 @@ function Stat({ value, label }) {
   );
 }
 
-function GridCard({ video, width, height, onPress }) {
+const GridCard = require('react').memo(function GridCard({ video, width, height, onPress }) {
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.8} style={[styles.gridCard, { width, height }]}>
       {video.thumbnail_url ? (
@@ -310,7 +320,7 @@ function GridCard({ video, width, height, onPress }) {
       </View>
     </TouchableOpacity>
   );
-}
+});
 
 function MenuItem({ icon, label, onPress, color }) {
   return (

@@ -159,7 +159,7 @@ function MainTabs() {
                   tabBarInactiveTintColor: COLORS.mode === 'light' ? 'rgba(11,21,38,0.55)' : 'rgba(255,255,255,0.75)',
                   tabBarIcon: ({ color, focused }) => {
                               if (route.name === 'Perfil') return <PerfilTabIcon color={color} focused={focused} />;
-                              const icons = { Feed: 'home', Descobrir: 'search', Camera: 'add-circle', Chat: 'chatbubble' };
+                              const icons = { Feed: 'play-circle', Descobrir: 'search', Camera: 'add-circle', Chat: 'chatbubble' };
                               const name = icons[route.name] + (focused ? '' : '-outline');
                               return <Ionicons name={name} color={color} size={route.name === 'Camera' ? 30 : 22} />;
 },

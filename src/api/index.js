@@ -25,12 +25,18 @@ export async function refreshSession(refreshToken) {
             },
             body: JSON.stringify({ refresh_token: refreshToken }),
         });
-        if (!r.ok) return null;
+        if (!r.ok) {
+            // DISTINÇÃO CRÍTICA (fix "desloga ao abrir" 2026-07-24):
+            // 400/401 = refresh token DE FATO inválido/revogado → { invalid }.
+            // 5xx/outros = problema de infra → null (NUNCA desloga por isso).
+            if (r.status === 400 || r.status === 401) return { invalid: true };
+            return null;
+        }
         const d = await r.json();
         if (!d?.access_token) return null;
         return { access_token: d.access_token, refresh_token: d.refresh_token, user: d.user };
     } catch (e) {
-        // network error / timeout / DNS — retorna null silencioso
+        // network error / timeout / DNS — retorna null silencioso (mantém sessão)
         return null;
     }
 }
@@ -177,19 +183,23 @@ export const blueAPI = {
     // TODO: remover quando confirmado que ninguem depende.
     refresh: (refresh_token) => api('auth', { method: 'POST', body: JSON.stringify({ action: 'refresh', refresh_token }) }),
 
-    // Feed
+    // Feed da HOME (2026-07-24, estilo TikTok): seguidos por views + descoberta
+    // 1-a-cada-4 (80+ views). Logado usa feed-inicial; visitante cai no default.
     feed: async (cursor) => {
           const token = await getToken();
           const q = cursor ? `&cursor=${encodeURIComponent(cursor)}` : '';
           const tk = token ? `&token=${encodeURIComponent(token)}` : '';
+          if (token) return api(`blue-feed?action=feed-inicial&limit=10${q}${tk}`);
           return api(`blue-feed?limit=10${q}${tk}`);
     },
     trending: () => api('blue-feed?action=trending-hashtags'),
     hashtagFeed: (tag) => api(`blue-feed?action=hashtag-feed&hashtag=${encodeURIComponent(tag)}`),
     // Video unico (VideoScreen nativa) — short-circuit do backend
     videoById: (id) => api(`blue-feed?video_id=${encodeURIComponent(id)}`),
-    // Explorar: TODOS os videos do app (paginado por recencia), sem filtro de follow
-    explore: (cursor) => api(`blue-feed?limit=24${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`),
+    // Explorar/Descobrir: só vídeos VALIDADOS (100+ views — user 2026-07-24)
+    explore: (cursor) => api(`blue-feed?limit=24&min_views=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`),
+    // Busca de perfis/hashtags/vídeos (barra do Descobrir)
+    busca: (q) => api(`blue-feed?action=busca&q=${encodeURIComponent(q || '')}`),
     livesAtivas: () => api('blue-lives?action=lives-ativas'),
     stats: () => api('blue-feed?action=stats'),
 

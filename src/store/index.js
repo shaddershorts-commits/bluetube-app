@@ -23,6 +23,30 @@ export const useAuthStore = create((set) => ({
     else await SecureStore.deleteItemAsync('bt_token');
     set({ token });
   },
+  // Refresh PROATIVO (chamado quando o app volta pro 1º plano): renova o
+  // access token (vida ~1h) — "logou uma vez, fica pra sempre" (Instagram).
+  // Throttle de 5min; só desloga se o Supabase disser que o refresh é inválido.
+  refreshNow: async () => {
+    try {
+      const now = Date.now();
+      if (now - (globalThis.__btLastRefresh || 0) < 5 * 60 * 1000) return;
+      globalThis.__btLastRefresh = now;
+      const refresh = await SecureStore.getItemAsync('bt_refresh_token');
+      if (!refresh) return;
+      const { refreshSession } = require('../api');
+      const rs = await refreshSession(refresh);
+      if (rs?.access_token) {
+        await SecureStore.setItemAsync('bt_token', rs.access_token).catch(() => {});
+        if (rs.refresh_token) await SecureStore.setItemAsync('bt_refresh_token', rs.refresh_token).catch(() => {});
+        set({ token: rs.access_token, ...(rs.user ? { user: rs.user } : {}) });
+      } else if (rs?.invalid) {
+        await SecureStore.deleteItemAsync('bt_token').catch(() => {});
+        await SecureStore.deleteItemAsync('bt_refresh_token').catch(() => {});
+        set({ token: null, user: null });
+      }
+      // null (rede/infra) = mantém como está; tenta de novo no próximo foreground
+    } catch (e) {}
+  },
   setUser: (user) => set({ user }),
   markIntroSeen: async () => {
     await SecureStore.setItemAsync('bt_intro_visto', '1').catch(() => {});
@@ -99,10 +123,18 @@ export const useAuthStore = create((set) => ({
           if (rs.refresh_token) {
             await SecureStore.setItemAsync('bt_refresh_token', rs.refresh_token).catch(() => {});
           }
-        } else {
-          // Refresh tambem expirou — limpa tudo, vai pra LoginScreen
+        } else if (rs?.invalid) {
+          // Supabase disse EXPLICITAMENTE que o refresh morreu (revogado/expirado)
+          // — só AQUI desloga. Vai pra LoginScreen.
           await SecureStore.deleteItemAsync('bt_token').catch(() => {});
           await SecureStore.deleteItemAsync('bt_refresh_token').catch(() => {});
+        } else {
+          // Falha de REDE/infra no refresh (comum no cold start: o app abre
+          // antes do rádio/Wi-Fi acordar). NUNCA desloga por isso — mantém a
+          // sessão otimista com o token salvo; o refresh de foreground
+          // (refreshNow) conserta assim que a rede volta. Fix do bug
+          // "fecho e abro e desloga" (user 2026-07-24, padrão Instagram).
+          validToken = token;
         }
       }
 

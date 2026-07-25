@@ -54,6 +54,8 @@ function App() {
     const sub = AppState.addEventListener('change', (st) => {
       useFeedStore.getState().setAppActive(st === 'active');
       beat(st === 'active' ? 'online' : 'offline');
+      // sessão eterna: renova o access token ao voltar pro app (throttle 5min)
+      if (st === 'active') useAuthStore.getState().refreshNow?.();
     });
     return () => { sub.remove(); clearInterval(hb); };
   }, []);

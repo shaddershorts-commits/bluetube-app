@@ -5,6 +5,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList, ScrollView,
   RefreshControl, Image, useWindowDimensions, ActivityIndicator, DeviceEventEmitter,
+  TextInput, Keyboard,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,6 +33,25 @@ export default function DiscoverScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const cursorRef = useRef(null);
   const hasMoreRef = useRef(true);
+  // busca de perfis (user 2026-07-24): digitou → debounce 350ms → resultados
+  const [busca, setBusca] = useState('');
+  const [buscando, setBuscando] = useState(false);
+  const [resultados, setResultados] = useState(null); // null = sem busca ativa
+  const buscaDeb = useRef(null);
+  const onBusca = (txt) => {
+    setBusca(txt);
+    clearTimeout(buscaDeb.current);
+    const q = txt.trim();
+    if (!q) { setResultados(null); setBuscando(false); return; }
+    setBuscando(true);
+    buscaDeb.current = setTimeout(async () => {
+      try {
+        const d = await blueAPI.busca(q);
+        setResultados({ usuarios: d?.usuarios || [], hashtags: d?.hashtags || [] });
+      } catch (_) { setResultados({ usuarios: [], hashtags: [] }); }
+      setBuscando(false);
+    }, 350);
+  };
 
   const cardW = (W - GAP * 4) / 3;
   const cardH = cardW * 1.55;
@@ -98,6 +118,72 @@ export default function DiscoverScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: COLORS.background }}>
       <Header title={t('discover_title')} />
+      {/* barra de pesquisa: acha perfis por nome/@ (user 2026-07-24) */}
+      <View style={styles.searchWrap}>
+        <Ionicons name="search" size={16} color="rgba(200,225,255,0.45)" />
+        <TextInput
+          style={styles.searchInput}
+          value={busca}
+          onChangeText={onBusca}
+          placeholder="Buscar perfis e criadores…"
+          placeholderTextColor="rgba(200,225,255,0.35)"
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="search"
+        />
+        {busca ? (
+          <TouchableOpacity onPress={() => { setBusca(''); setResultados(null); Keyboard.dismiss(); }}>
+            <Ionicons name="close-circle" size={18} color="rgba(200,225,255,0.45)" />
+          </TouchableOpacity>
+        ) : null}
+      </View>
+      {resultados !== null ? (
+        <FlatList
+          data={resultados.usuarios}
+          keyExtractor={(u) => u.user_id}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ paddingBottom: 120 }}
+          renderItem={({ item: u }) => (
+            <TouchableOpacity
+              style={styles.userRow}
+              activeOpacity={0.7}
+              onPress={() => { Keyboard.dismiss(); nav.navigate('PerfilUsuario', { user_id: u.user_id }); }}>
+              {u.avatar_url ? (
+                <Image source={{ uri: u.avatar_url }} style={styles.userAvatar} />
+              ) : (
+                <View style={[styles.userAvatar, styles.userAvatarPh]}>
+                  <Ionicons name="person" size={18} color="rgba(200,225,255,0.4)" />
+                </View>
+              )}
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Text style={styles.userName} numberOfLines={1}>@{u.username}</Text>
+                  {u.verificado ? <Ionicons name="checkmark-circle" size={14} color={COLORS.neon} /> : null}
+                </View>
+                {u.display_name ? <Text style={styles.userDisplay} numberOfLines={1}>{u.display_name}</Text> : null}
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="rgba(200,225,255,0.3)" />
+            </TouchableOpacity>
+          )}
+          ListHeaderComponent={
+            resultados.hashtags?.length ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 12, paddingVertical: 10 }}>
+                {resultados.hashtags.map((tg, i) => (
+                  <TouchableOpacity key={tg.id || i} style={styles.chip} activeOpacity={0.7}
+                    onPress={() => nav.navigate('Hashtag', { tag: tg.nome })}>
+                    <Text style={styles.chipText}>#{tg.nome}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            ) : null
+          }
+          ListEmptyComponent={
+            buscando
+              ? <ActivityIndicator color={COLORS.neon} style={{ marginTop: 30 }} />
+              : <Text style={styles.empty}>Nenhum perfil encontrado</Text>
+          }
+        />
+      ) : (
       <FlatList
         ref={gridRef}
         data={videos}
@@ -135,6 +221,7 @@ export default function DiscoverScreen() {
           loadingMore ? <ActivityIndicator color={COLORS.neon} style={{ marginVertical: 16 }} /> : null
         }
       />
+      )}
     </View>
   );
 }
@@ -157,4 +244,20 @@ const styles = StyleSheet.create({
   },
   badgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
   empty: { color: COLORS.textSecondary, padding: 40, textAlign: 'center', fontSize: 13 },
+  // busca de perfis
+  searchWrap: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginHorizontal: 12, marginBottom: 8, paddingHorizontal: 12,
+    backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1,
+    borderColor: 'rgba(0,170,255,0.18)', borderRadius: 12, height: 42,
+  },
+  searchInput: { flex: 1, color: '#e8f4ff', fontSize: 14, paddingVertical: 0 },
+  userRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 14, paddingVertical: 10,
+  },
+  userAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.08)' },
+  userAvatarPh: { alignItems: 'center', justifyContent: 'center' },
+  userName: { color: '#e8f4ff', fontSize: 14.5, fontWeight: '700' },
+  userDisplay: { color: 'rgba(200,225,255,0.55)', fontSize: 12.5, marginTop: 1 },
 });

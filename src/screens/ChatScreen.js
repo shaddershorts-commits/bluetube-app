@@ -4,10 +4,10 @@
 // - Status: mecânica WhatsApp — só CONTATOS aceitos veem (audience='status'),
 //   dura 24h, quem viu/curtiu/comentou aparece no viewer; FAB posta direto.
 // - Tema: cores/fonte/ícones vêm de useChatTheme (Configurações → Temas).
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator,
-  RefreshControl, TextInput, Modal, Pressable, Alert,
+  RefreshControl, TextInput, Modal, Pressable, Alert, Animated, Easing,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -102,7 +102,7 @@ export default function ChatScreen() {
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: tipo === 'video' ? ImagePicker.MediaTypeOptions.Videos : ImagePicker.MediaTypeOptions.Images,
       quality: 0.8,
-      videoMaxDuration: 15,
+      videoMaxDuration: 180, // stories até 3 min (user 2026-07-24)
     });
     if (res.canceled || !res.assets?.[0]) return;
     const a = res.assets[0];
@@ -286,11 +286,7 @@ export default function ChatScreen() {
           }
         />
       ) : (
-        <View style={styles.empty}>
-          <Text style={styles.emptyIcon}>📞</Text>
-          <Text style={styles.emptyText}>Chamadas em breve</Text>
-          <Text style={styles.emptySub}>Ligações de voz e vídeo estão chegando</Text>
-        </View>
+        <ChamadasTeaser />
       )}
 
       {/* FAB: conversas = adicionar usuário · status = postar */}
@@ -334,7 +330,7 @@ export default function ChatScreen() {
         title="Postar no status (some em 24h)"
         options={[
           { icon: 'image-outline', label: 'Foto da galeria', onPress: () => postarStatus('imagem') },
-          { icon: 'videocam-outline', label: 'Vídeo (até 15s)', onPress: () => postarStatus('video') },
+          { icon: 'videocam-outline', label: 'Vídeo (até 3 min)', onPress: () => postarStatus('video') },
         ]}
         onClose={() => setPostMenu(false)}
       />
@@ -392,3 +388,74 @@ const mkStyles = (T) => StyleSheet.create({
   menuText: { color: T.text, fontSize: 14, fontFamily: T.font },
   menuDivider: { height: 1, backgroundColor: T.border },
 });
+
+// ── Teaser animado da aba Chamadas (user 2026-07-24): mostra o que a aba
+// vai virar — anéis pulsando estilo "ligação chegando" + recursos previstos.
+function ChamadasTeaser() {
+  const ring1 = useRef(new Animated.Value(0)).current;
+  const ring2 = useRef(new Animated.Value(0)).current;
+  const shake = useRef(new Animated.Value(0)).current;
+  const fade = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const pulse = (v, delay) => Animated.loop(
+      Animated.sequence([
+        Animated.delay(delay),
+        Animated.timing(v, { toValue: 1, duration: 1800, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        Animated.timing(v, { toValue: 0, duration: 0, useNativeDriver: true }),
+      ])
+    );
+    const ring = pulse(ring1, 0); ring.start();
+    const ring2Anim = pulse(ring2, 900); ring2Anim.start();
+    // telefone "tocando": balança a cada 3s
+    const shakeAnim = Animated.loop(
+      Animated.sequence([
+        Animated.delay(2200),
+        ...[8, -8, 6, -6, 3, 0].map((deg) =>
+          Animated.timing(shake, { toValue: deg, duration: 80, useNativeDriver: true })
+        ),
+      ])
+    );
+    shakeAnim.start();
+    Animated.timing(fade, { toValue: 1, duration: 700, useNativeDriver: true }).start();
+    return () => { ring.stop(); ring2Anim.stop(); shakeAnim.stop(); };
+  }, []);
+
+  const ringStyle = (v) => ({
+    position: 'absolute', width: 120, height: 120, borderRadius: 60,
+    borderWidth: 2, borderColor: '#00aaff',
+    opacity: v.interpolate({ inputRange: [0, 0.7, 1], outputRange: [0.55, 0.18, 0] }),
+    transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1.9] }) }],
+  });
+
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 36 }}>
+      <View style={{ width: 160, height: 160, alignItems: 'center', justifyContent: 'center', marginBottom: 26 }}>
+        <Animated.View style={ringStyle(ring1)} />
+        <Animated.View style={ringStyle(ring2)} />
+        <Animated.View style={{
+          width: 92, height: 92, borderRadius: 46, alignItems: 'center', justifyContent: 'center',
+          backgroundColor: 'rgba(0,170,255,0.14)', borderWidth: 1, borderColor: 'rgba(0,170,255,0.45)',
+          transform: [{ rotate: shake.interpolate({ inputRange: [-8, 8], outputRange: ['-8deg', '8deg'] }) }],
+        }}>
+          <Text style={{ fontSize: 40 }}>📞</Text>
+        </Animated.View>
+      </View>
+      <Animated.View style={{ opacity: fade, alignItems: 'center' }}>
+        <Text style={{ color: '#e8f4ff', fontSize: 20, fontWeight: '800', marginBottom: 8 }}>Chamadas estão chegando</Text>
+        <Text style={{ color: 'rgba(200,225,255,0.65)', fontSize: 13.5, textAlign: 'center', lineHeight: 20, marginBottom: 18 }}>
+          Muito em breve você vai poder ligar pros seus contatos direto daqui:
+        </Text>
+        {[['🎙️', 'Chamadas de voz com seus contatos'], ['📹', 'Chamadas de vídeo 1:1'], ['🔒', 'Direto do chat, com quem você já conversa']].map(([ic, txt]) => (
+          <View key={txt} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+            <Text style={{ fontSize: 17 }}>{ic}</Text>
+            <Text style={{ color: 'rgba(220,238,255,0.85)', fontSize: 13.5 }}>{txt}</Text>
+          </View>
+        ))}
+        <View style={{ marginTop: 14, backgroundColor: 'rgba(0,170,255,0.12)', borderWidth: 1, borderColor: 'rgba(0,170,255,0.35)', borderRadius: 100, paddingHorizontal: 16, paddingVertical: 7 }}>
+          <Text style={{ color: '#4fc3ff', fontSize: 11.5, fontWeight: '700', letterSpacing: 0.6 }}>EM DESENVOLVIMENTO ✨</Text>
+        </View>
+      </Animated.View>
+    </View>
+  );
+}
