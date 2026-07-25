@@ -20,7 +20,7 @@ export default function LogoBlueTube({
     return (
       <Image
         source={require('../../assets/logo para fundo branco.png')}
-        style={{ width, height }}
+        style={{ width: width * 1.4, height: height * 1.4 }}
         resizeMode="contain"
       />
     );

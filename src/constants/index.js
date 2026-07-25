@@ -46,7 +46,12 @@ export * from './theme';
 
 export const API_BASE = Constants.expoConfig?.extra?.apiBaseUrl || 'https://bluetubeviral.com/api';
 export const SUPABASE_URL = Constants.expoConfig?.extra?.supabaseUrl || 'https://pokpfvjrccviwgguwuck.supabase.co';
-export const SUPABASE_ANON_KEY = Constants.expoConfig?.extra?.supabaseKey || '';
+// Fallback EMBUTIDO (fix 2026-07-24, raiz do "login inválido"/"desloga"): a
+// key vinha do .env via extra no BUILD — mas .env é gitignored e a key chegava
+// VAZIA no app → TODAS as chamadas ao Supabase Auth (login direto, validação
+// de boot, refresh) morriam com "No API key found". A anon key é PÚBLICA por
+// design (vai em qualquer bundle web; RLS protege os dados).
+export const SUPABASE_ANON_KEY = Constants.expoConfig?.extra?.supabaseKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBva3BmdmpyY2N2aXdnZ3V3dWNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3MzUwNTQsImV4cCI6MjA5MDMxMTA1NH0.x7h7l4jsnlCkjVSNa9G2Nv1BhcRXcM0rLEQwhX2ivak';
 
 export const FONTS = {
   regular: 'System',
