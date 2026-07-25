@@ -10,6 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
+import { Video, ResizeMode } from 'expo-av';
 import { COLORS_DARK as COLORS } from '../constants';
 import blueAPI from '../api';
 
@@ -25,6 +26,11 @@ export default function CameraScreen() {
   const [escolha, setEscolha] = useState(null); // null = chooser | 'storie'
   const [videoUri, setVideoUri] = useState(null);
   const [publicando, setPublicando] = useState(false);
+  // ferramentas pré-gravação estilo Instagram (user 2026-07-24)
+  const [flashOn, setFlashOn] = useState(false);
+  const [timerSec, setTimerSec] = useState(0);        // 0 | 3 | 10
+  const [countdown, setCountdown] = useState(null);   // contagem na tela
+  const [previewMuted, setPreviewMuted] = useState(false);
   const cameraRef = useRef(null);
 
   // sempre que a aba ganha foco, volta pro chooser (fluxo limpo a cada entrada)
@@ -87,14 +93,31 @@ export default function CameraScreen() {
 
   const startRecording = async () => {
     if (!cameraRef.current) return;
+    // temporizador (mãos livres, estilo Instagram): 3s/10s de contagem na tela
+    if (timerSec > 0) {
+      for (let s = timerSec; s > 0; s--) {
+        setCountdown(s);
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+      setCountdown(null);
+    }
     setRecording(true);
     try {
       const video = await cameraRef.current.recordAsync({ maxDuration: STORIE_MAX_S });
       setVideoUri(video.uri);
+      setPreviewMuted(false);
     } catch (e) { Alert.alert('Erro', e.message); }
     setRecording(false);
   };
   const stopRecording = () => { cameraRef.current?.stopRecording(); };
+
+  const descartarPreview = () => {
+    // Instagram pergunta antes de jogar fora
+    Alert.alert('Descartar storie?', 'O vídeo gravado vai ser perdido.', [
+      { text: 'Continuar editando', style: 'cancel' },
+      { text: 'Descartar', style: 'destructive', onPress: () => setVideoUri(null) },
+    ]);
+  };
 
   // ── CHOOSER (primeira tela da aba ＋) ──
   if (escolha === null) {
@@ -144,60 +167,105 @@ export default function CameraScreen() {
     );
   }
 
+  // ── PREVIEW estilo Instagram: o storie TOCA em loop pra REVER antes de
+  // postar (user 2026-07-24). X descarta (com confirmação), 🔊 muta,
+  // "Seu storie" (pílula, base-esquerda) e ➤ (base-direita) publicam.
   if (videoUri) {
     return (
       <View style={styles.container}>
-        <SafeAreaView style={styles.previewHeader}>
-          <TouchableOpacity onPress={() => setVideoUri(null)}>
+        <Video
+          source={{ uri: videoUri }}
+          style={StyleSheet.absoluteFill}
+          resizeMode={ResizeMode.COVER}
+          shouldPlay
+          isLooping
+          isMuted={previewMuted}
+        />
+        <SafeAreaView style={styles.header}>
+          <TouchableOpacity onPress={descartarPreview} style={styles.iconBtn}>
             <Ionicons name="close" color="#fff" size={28} />
           </TouchableOpacity>
-          <Text style={styles.previewTitle}>Seu storie</Text>
-          <View style={{ width: 28 }} />
+          <View style={{ flex: 1 }} />
+          <TouchableOpacity onPress={() => setPreviewMuted((m) => !m)} style={styles.iconBtn}>
+            <Ionicons name={previewMuted ? 'volume-mute' : 'volume-high'} color="#fff" size={24} />
+          </TouchableOpacity>
         </SafeAreaView>
-        <View style={styles.previewBody}>
-          <Text style={styles.previewIcon}>✨</Text>
-          <Text style={styles.previewText}>Gravado! Publicar no seu Status?</Text>
+        <View style={styles.previewFooter}>
           <TouchableOpacity
-            style={styles.publishBtn}
+            style={styles.seuStorieBtn}
             onPress={() => publicarStorie(videoUri, 'video', 'video/mp4')}
             disabled={publicando}>
-            {publicando ? <ActivityIndicator color="#fff" /> : <Text style={styles.publishBtnText}>Publicar storie →</Text>}
+            {publicando ? <ActivityIndicator color="#0a1526" size="small" /> : (
+              <>
+                <View style={styles.seuStorieAvatar}><Text style={{ fontSize: 14 }}>✨</Text></View>
+                <Text style={styles.seuStorieText}>Seu storie</Text>
+              </>
+            )}
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => setVideoUri(null)}>
-            <Text style={styles.discard}>Gravar novamente</Text>
+          <View style={{ flex: 1 }} />
+          <TouchableOpacity
+            style={styles.sendFab}
+            onPress={() => publicarStorie(videoUri, 'video', 'video/mp4')}
+            disabled={publicando}>
+            {publicando ? <ActivityIndicator color="#fff" size="small" /> : <Ionicons name="arrow-forward" color="#fff" size={24} />}
           </TouchableOpacity>
         </View>
       </View>
     );
   }
 
+  // ── CÂMERA estilo Instagram: X no topo-esquerdo, rail de ferramentas à
+  // esquerda (flash + temporizador), galeria embaixo-esquerda, captura no
+  // centro, virar câmera embaixo-direita.
   return (
     <View style={styles.container}>
-      <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing={facing} mode="video" />
+      <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing={facing} mode="video" enableTorch={flashOn && facing === 'back'} />
 
       <SafeAreaView style={styles.header}>
         <TouchableOpacity onPress={() => setEscolha(null)} style={styles.iconBtn}>
-          <Ionicons name="arrow-back" color="#fff" size={26} />
+          <Ionicons name="close" color="#fff" size={28} />
         </TouchableOpacity>
         <View style={styles.storieBadge}>
           <Text style={styles.storieBadgeText}>✨ Storie · até 3 min</Text>
         </View>
-        <TouchableOpacity onPress={() => setFacing((f) => (f === 'front' ? 'back' : 'front'))} style={styles.iconBtn}>
-          <Ionicons name="camera-reverse" color="#fff" size={28} />
-        </TouchableOpacity>
+        <View style={{ width: 40 }} />
       </SafeAreaView>
+
+      {/* rail de ferramentas (esquerda, estilo Instagram) */}
+      {!recording && (
+        <View style={styles.toolRail}>
+          <TouchableOpacity style={styles.toolBtn} onPress={() => setFlashOn((f) => !f)}>
+            <Ionicons name={flashOn ? 'flash' : 'flash-off'} color={flashOn ? '#ffd32a' : '#fff'} size={22} />
+            <Text style={styles.toolLabel}>Flash</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.toolBtn} onPress={() => setTimerSec((s) => (s === 0 ? 3 : s === 3 ? 10 : 0))}>
+            <Ionicons name="timer-outline" color={timerSec ? '#ffd32a' : '#fff'} size={22} />
+            <Text style={styles.toolLabel}>{timerSec ? `${timerSec}s` : 'Timer'}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* contagem regressiva do temporizador */}
+      {countdown != null && (
+        <View style={styles.countdownWrap} pointerEvents="none">
+          <Text style={styles.countdownText}>{countdown}</Text>
+        </View>
+      )}
 
       <View style={styles.controls}>
         <View style={styles.controlsRow}>
-          <View style={{ width: 52 }} />
+          <TouchableOpacity onPress={storieDaGaleria} style={styles.galleryBtn} disabled={recording || publicando}>
+            <Ionicons name="images-outline" color="#fff" size={24} />
+            <Text style={styles.galleryText}>Galeria</Text>
+          </TouchableOpacity>
           <TouchableOpacity
             onPress={recording ? stopRecording : startRecording}
             style={[styles.recBtn, recording && styles.recBtnActive]}>
             <View style={[styles.recInner, recording && styles.recInnerActive]} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={storieDaGaleria} style={styles.galleryBtn} disabled={recording || publicando}>
-            <Ionicons name="images-outline" color="#fff" size={24} />
-            <Text style={styles.galleryText}>Galeria</Text>
+          <TouchableOpacity onPress={() => setFacing((f) => (f === 'front' ? 'back' : 'front'))} style={styles.galleryBtn} disabled={recording}>
+            <Ionicons name="camera-reverse" color="#fff" size={26} />
+            <Text style={styles.galleryText}>Virar</Text>
           </TouchableOpacity>
         </View>
         {recording && <Text style={styles.recText}>Gravando…</Text>}
@@ -234,6 +302,25 @@ const styles = StyleSheet.create({
   publishBtn: { backgroundColor: COLORS.primary, paddingVertical: 16, paddingHorizontal: 32, borderRadius: 14, marginTop: 12 },
   publishBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
   discard: { color: COLORS.textSecondary, fontSize: 13, marginTop: 8 },
+  // preview estilo Instagram
+  previewFooter: {
+    position: 'absolute', bottom: 34, left: 16, right: 16,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+  },
+  seuStorieBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#fff', borderRadius: 100, paddingVertical: 10, paddingHorizontal: 16,
+    minWidth: 130, justifyContent: 'center',
+  },
+  seuStorieAvatar: { width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(0,170,255,0.18)', alignItems: 'center', justifyContent: 'center' },
+  seuStorieText: { color: '#0a1526', fontWeight: '800', fontSize: 14 },
+  sendFab: { width: 52, height: 52, borderRadius: 26, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
+  // rail de ferramentas
+  toolRail: { position: 'absolute', left: 12, top: 110, gap: 16, alignItems: 'center' },
+  toolBtn: { alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,.3)', borderRadius: 12, padding: 9, minWidth: 52 },
+  toolLabel: { color: '#fff', fontSize: 9.5, fontWeight: '700' },
+  countdownWrap: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  countdownText: { color: '#fff', fontSize: 110, fontWeight: '900', textShadowColor: 'rgba(0,0,0,.6)', textShadowRadius: 16 },
   // chooser
   chooserWrap: { flex: 1, backgroundColor: '#05101f' },
   chooserHeader: { paddingHorizontal: 12, paddingTop: 8 },

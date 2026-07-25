@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1.5, borderColor: 'rgba(0,170,255,0.25)',
     borderRadius: 12, textAlign: 'center',
-    color: '#fff', fontSize: 22, fontWeight: '700',
+    color: COLORS.text, fontSize: 22, fontWeight: '700',
   },
   otpInputFilled: { borderColor: COLORS.accent, backgroundColor: 'rgba(0,170,255,0.1)' },
   otpInputError: { borderColor: COLORS.error },

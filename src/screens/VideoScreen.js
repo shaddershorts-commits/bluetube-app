@@ -118,8 +118,18 @@ export default function VideoScreen({ route, navigation }) {
           data={videos}
           keyExtractor={(item) => item.id}
           renderItem={({ item, index }) => {
-            if (!item || !item.id || !item.video_url) return null;
-            return <VideoCard video={item} index={index} cardHeight={CARD_H} activeOverride={index === activeIdx} />;
+            // slot inválido vira placeholder da MESMA altura (null quebrava o
+            // paging/snap — user 2026-07-24 "vídeos não reproduzem")
+            if (!item || !item.id || !item.video_url) {
+              return <View style={{ height: CARD_H, backgroundColor: '#000' }} />;
+            }
+            return (
+              <VideoCard
+                video={item} index={index} cardHeight={CARD_H}
+                activeOverride={index === activeIdx}
+                nearActive={Math.abs(index - activeIdx) <= 1}
+              />
+            );
           }}
           estimatedItemSize={CARD_H}
           snapToInterval={CARD_H}

@@ -180,7 +180,14 @@ export default function ProfileScreen() {
             video={v}
             width={cardW}
             height={cardH}
-            onPress={() => nav.navigate('Video', { videos, startIndex: videos.indexOf(v), mode: 'user', creator: profile })}
+            onPress={() => {
+              // só vídeos com video_url entram no player (processando fica fora
+              // — slot nulo quebrava o paging); índice recalculado na lista filtrada
+              const playable = sortedVideos.filter((x) => x && x.video_url);
+              const idx = Math.max(0, playable.findIndex((x) => x.id === v.id));
+              if (!v.video_url) { Alert.alert('Processando', 'Esse vídeo ainda está sendo processado. Tenta de novo em instantes.'); return; }
+              nav.navigate('Video', { videos: playable, startIndex: idx, mode: 'user', creator: profile });
+            }}
           />
         )}
         ListEmptyComponent={

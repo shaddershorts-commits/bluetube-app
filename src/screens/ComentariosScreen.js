@@ -16,7 +16,7 @@ import blueAPI from '../api';
 import { useAuthStore } from '../store';
 import { requireAuth } from '../utils/requireAuth';
 import { openModeration } from '../utils/moderation';
-import { COLORS_DARK as COLORS } from '../constants';
+import { COLORS } from '../constants'; // segue o TEMA (claro/escuro) — user 2026-07-24
 
 function ago(iso) {
   if (!iso) return '';

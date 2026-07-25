@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(255,255,255,0.06)',
   },
-  headerTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  headerTitle: { color: COLORS.text, fontSize: 16, fontWeight: '700' },
   saveBtn: { color: COLORS.neon, fontSize: 15, fontWeight: '800', paddingHorizontal: 8 },
   saveBtnDisabled: { color: COLORS.textDim },
   body: { padding: 18, paddingBottom: 48, gap: 18 },
@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   input: {
-    color: '#fff',
+    color: COLORS.text,
     backgroundColor: 'rgba(255,255,255,0.04)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',

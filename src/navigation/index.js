@@ -125,6 +125,23 @@ function PerfilTabIcon({ color, focused }) {
 
 function MainTabs() {
     const insets = useSafeAreaInsets();
+    // Badge de MENSAGENS NÃO LIDAS na tab do Chat (user 2026-07-24): poll a
+    // cada 45s + ao voltar pro app; some ao zerar. Guest = sem poll.
+    const token = useAuthStore((s) => s.token);
+    const [chatUnread, setChatUnread] = useState(0);
+    useEffect(() => {
+      if (!token) { setChatUnread(0); return; }
+      let alive = true;
+      const check = () => {
+        blueAPI.chatUnreadCount()
+          .then((d) => { if (alive && typeof d?.count === 'number') setChatUnread(d.count); })
+          .catch(() => {});
+      };
+      check();
+      const iv = setInterval(check, 45000);
+      const sub = DeviceEventEmitter.addListener('bt-tab-reselect', (tab) => { if (tab === 'Chat') setTimeout(check, 1500); });
+      return () => { alive = false; clearInterval(iv); sub.remove(); };
+    }, [token]);
     return (
           <Tab.Navigator
         screenOptions={({ route }) => ({
@@ -183,7 +200,8 @@ function MainTabs() {
       <Tab.Screen name="Feed" component={FeedScreen} />
         <Tab.Screen name="Descobrir" component={DiscoverScreen} />
         <Tab.Screen name="Camera" component={CameraScreen} options={{ tabBarLabel: '' }} />
-      <Tab.Screen name="Chat" component={ChatScreen} />
+      <Tab.Screen name="Chat" component={ChatScreen}
+        options={chatUnread > 0 ? { tabBarBadge: chatUnread > 99 ? '99+' : chatUnread, tabBarBadgeStyle: { backgroundColor: '#ef4444', color: '#fff', fontSize: 10, fontWeight: '800' } } : {}} />
         <Tab.Screen name="Perfil" component={ProfileScreen} />
   </Tab.Navigator>
   );

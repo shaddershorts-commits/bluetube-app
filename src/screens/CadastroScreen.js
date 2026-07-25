@@ -287,7 +287,7 @@ const styles = StyleSheet.create({
   },
   inputFocus: { borderColor: 'rgba(0,170,255,0.6)' },
   icon: { marginRight: 10 },
-  input: { flex: 1, paddingVertical: 14, color: '#fff', fontSize: 15 },
+  input: { flex: 1, paddingVertical: 14, color: COLORS.text, fontSize: 15 },
   eye: { padding: 6 },
   forcaWrap: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, marginLeft: 4 },
   forcaBars: { flexDirection: 'row', gap: 4, marginRight: 8 },

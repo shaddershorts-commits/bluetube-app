@@ -27,29 +27,43 @@ export default function DiscoverScreen() {
   const nav = useNavigation();
   const t = useT();
   const { width: W } = useWindowDimensions();
-  const [hashtags, setHashtags] = useState([]);
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const cursorRef = useRef(null);
   const hasMoreRef = useRef(true);
-  // busca de perfis (user 2026-07-24): digitou → debounce 350ms → resultados
+  // busca (user 2026-07-24): nome PARCIAL acha perfis ("carlos" → @carlosdepol);
+  // começar com # busca HASHTAGS (toca → feed da hashtag). Debounce 350ms.
+  // Defensivo total: qualquer resposta estranha vira lista vazia, nunca erro.
   const [busca, setBusca] = useState('');
   const [buscando, setBuscando] = useState(false);
   const [resultados, setResultados] = useState(null); // null = sem busca ativa
   const buscaDeb = useRef(null);
+  const buscaSeq = useRef(0);
   const onBusca = (txt) => {
     setBusca(txt);
-    clearTimeout(buscaDeb.current);
-    const q = txt.trim();
+    if (buscaDeb.current) clearTimeout(buscaDeb.current);
+    const q = String(txt || '').trim();
     if (!q) { setResultados(null); setBuscando(false); return; }
     setBuscando(true);
-    buscaDeb.current = setTimeout(async () => {
-      try {
-        const d = await blueAPI.busca(q);
-        setResultados({ usuarios: d?.usuarios || [], hashtags: d?.hashtags || [] });
-      } catch (_) { setResultados({ usuarios: [], hashtags: [] }); }
-      setBuscando(false);
+    const seq = ++buscaSeq.current;
+    buscaDeb.current = setTimeout(() => {
+      const isTag = q.startsWith('#');
+      const termo = isTag ? q.slice(1).trim() : q;
+      Promise.resolve()
+        .then(() => (termo ? blueAPI.busca(termo) : null))
+        .then((d) => {
+          if (seq !== buscaSeq.current) return; // resposta velha: descarta
+          const usuarios = Array.isArray(d?.usuarios) ? d.usuarios.filter((u) => u && u.user_id) : [];
+          const hashtags = Array.isArray(d?.hashtags) ? d.hashtags.filter((t2) => t2 && t2.nome) : [];
+          setResultados(isTag ? { usuarios: [], hashtags, soTag: true } : { usuarios, hashtags });
+          setBuscando(false);
+        })
+        .catch(() => {
+          if (seq !== buscaSeq.current) return;
+          setResultados({ usuarios: [], hashtags: [] });
+          setBuscando(false);
+        });
     }, 350);
   };
 
@@ -59,11 +73,7 @@ export default function DiscoverScreen() {
   const load = useCallback(async (reset = false) => {
     if (reset) { setLoading(true); cursorRef.current = null; hasMoreRef.current = true; }
     try {
-      const [tags, vids] = await Promise.all([
-        blueAPI.trending().catch(() => null),
-        blueAPI.explore(reset ? null : cursorRef.current),
-      ]);
-      if (tags?.hashtags) setHashtags(tags.hashtags);
+      const vids = await blueAPI.explore(reset ? null : cursorRef.current);
       const incoming = (vids?.videos || []).filter((v) => v && v.id && v.video_url);
       setVideos((prev) => {
         if (reset) return incoming;
@@ -139,48 +149,56 @@ export default function DiscoverScreen() {
       </View>
       {resultados !== null ? (
         <FlatList
-          data={resultados.usuarios}
-          keyExtractor={(u) => u.user_id}
+          data={[
+            ...(resultados.hashtags || []).map((t2, i) => ({ _k: 'h' + String(t2.id ?? t2.nome ?? i), tipo: 'hashtag', item: t2 })),
+            ...(resultados.soTag ? [] : (resultados.usuarios || []).map((u, i) => ({ _k: 'u' + String(u.user_id ?? i), tipo: 'user', item: u }))),
+          ]}
+          keyExtractor={(row) => row._k}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ paddingBottom: 120 }}
-          renderItem={({ item: u }) => (
-            <TouchableOpacity
-              style={styles.userRow}
-              activeOpacity={0.7}
-              onPress={() => { Keyboard.dismiss(); nav.navigate('PerfilUsuario', { user_id: u.user_id }); }}>
-              {u.avatar_url ? (
-                <Image source={{ uri: u.avatar_url }} style={styles.userAvatar} />
-              ) : (
-                <View style={[styles.userAvatar, styles.userAvatarPh]}>
-                  <Ionicons name="person" size={18} color="rgba(200,225,255,0.4)" />
+          renderItem={({ item: row }) => {
+            if (row.tipo === 'hashtag') {
+              const tg = row.item;
+              return (
+                <TouchableOpacity style={styles.userRow} activeOpacity={0.7}
+                  onPress={() => { Keyboard.dismiss(); nav.navigate('Hashtag', { tag: String(tg.nome || '') }); }}>
+                  <View style={[styles.userAvatar, styles.userAvatarPh]}>
+                    <Text style={{ color: COLORS.neon, fontSize: 18, fontWeight: '800' }}>#</Text>
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={styles.userName} numberOfLines={1}>#{String(tg.nome || '')}</Text>
+                    <Text style={styles.userDisplay}>{String(tg.usos || 0)} vídeos</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color="rgba(200,225,255,0.3)" />
+                </TouchableOpacity>
+              );
+            }
+            const u = row.item;
+            return (
+              <TouchableOpacity style={styles.userRow} activeOpacity={0.7}
+                onPress={() => { Keyboard.dismiss(); nav.navigate('PerfilUsuario', { user_id: u.user_id }); }}>
+                {u.avatar_url ? (
+                  <Image source={{ uri: u.avatar_url }} style={styles.userAvatar} />
+                ) : (
+                  <View style={[styles.userAvatar, styles.userAvatarPh]}>
+                    <Ionicons name="person" size={18} color="rgba(200,225,255,0.4)" />
+                  </View>
+                )}
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Text style={styles.userName} numberOfLines={1}>@{String(u.username || '')}</Text>
+                    {u.verificado ? <Ionicons name="checkmark-circle" size={14} color={COLORS.neon} /> : null}
+                  </View>
+                  {u.display_name ? <Text style={styles.userDisplay} numberOfLines={1}>{String(u.display_name)}</Text> : null}
                 </View>
-              )}
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Text style={styles.userName} numberOfLines={1}>@{u.username}</Text>
-                  {u.verificado ? <Ionicons name="checkmark-circle" size={14} color={COLORS.neon} /> : null}
-                </View>
-                {u.display_name ? <Text style={styles.userDisplay} numberOfLines={1}>{u.display_name}</Text> : null}
-              </View>
-              <Ionicons name="chevron-forward" size={16} color="rgba(200,225,255,0.3)" />
-            </TouchableOpacity>
-          )}
-          ListHeaderComponent={
-            resultados.hashtags?.length ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 12, paddingVertical: 10 }}>
-                {resultados.hashtags.map((tg, i) => (
-                  <TouchableOpacity key={tg.id || i} style={styles.chip} activeOpacity={0.7}
-                    onPress={() => nav.navigate('Hashtag', { tag: tg.nome })}>
-                    <Text style={styles.chipText}>#{tg.nome}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            ) : null
-          }
+                <Ionicons name="chevron-forward" size={16} color="rgba(200,225,255,0.3)" />
+              </TouchableOpacity>
+            );
+          }}
           ListEmptyComponent={
             buscando
               ? <ActivityIndicator color={COLORS.neon} style={{ marginTop: 30 }} />
-              : <Text style={styles.empty}>Nenhum perfil encontrado</Text>
+              : <Text style={styles.empty}>{busca.startsWith('#') ? 'Nenhuma hashtag encontrada' : 'Nenhum perfil encontrado'}</Text>
           }
         />
       ) : (
@@ -195,25 +213,6 @@ export default function DiscoverScreen() {
         refreshControl={<RefreshControl refreshing={loading} onRefresh={() => load(true)} tintColor={COLORS.neon} />}
         onEndReached={loadMore}
         onEndReachedThreshold={1.5}
-        ListHeaderComponent={
-          hashtags.length > 0 ? (
-            <View style={styles.tagsWrap}>
-              <Text style={styles.tagsTitle}>🔥 {t('discover_tags')}</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 12 }}>
-                {hashtags.map((tg, i) => (
-                  <TouchableOpacity
-                    key={tg.id || i}
-                    style={styles.chip}
-                    activeOpacity={0.7}
-                    onPress={() => nav.navigate('Hashtag', { tag: tg.nome })}>
-                    <Text style={styles.chipText}>#{tg.nome}</Text>
-                    <Text style={styles.chipCount}>{tg.usos}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          ) : null
-        }
         ListEmptyComponent={
           !loading ? <Text style={styles.empty}>{t('discover_empty')}</Text> : null
         }
@@ -248,16 +247,16 @@ const styles = StyleSheet.create({
   searchWrap: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     marginHorizontal: 12, marginBottom: 8, paddingHorizontal: 12,
-    backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1,
-    borderColor: 'rgba(0,170,255,0.18)', borderRadius: 12, height: 42,
+    backgroundColor: COLORS.surface, borderWidth: 1,
+    borderColor: COLORS.border, borderRadius: 12, height: 42,
   },
-  searchInput: { flex: 1, color: '#e8f4ff', fontSize: 14, paddingVertical: 0 },
+  searchInput: { flex: 1, color: COLORS.text, fontSize: 14, paddingVertical: 0 },
   userRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingHorizontal: 14, paddingVertical: 10,
   },
-  userAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.08)' },
+  userAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.surface },
   userAvatarPh: { alignItems: 'center', justifyContent: 'center' },
-  userName: { color: '#e8f4ff', fontSize: 14.5, fontWeight: '700' },
-  userDisplay: { color: 'rgba(200,225,255,0.55)', fontSize: 12.5, marginTop: 1 },
+  userName: { color: COLORS.text, fontSize: 14.5, fontWeight: '700' },
+  userDisplay: { color: COLORS.textSecondary, fontSize: 12.5, marginTop: 1 },
 });

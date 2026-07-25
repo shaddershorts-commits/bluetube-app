@@ -26,7 +26,7 @@ function App() {
     (async () => {
       try {
         const m = await SecureStore.getItemAsync('bt_app_mode');
-        applyMode(m === 'light' ? 'light' : 'dark');
+        applyMode(m === 'dark' ? 'dark' : 'light'); // CLARO é o padrão (user 2026-07-24)
       } catch (e) { /* dark default */ }
       const N = require('./src/navigation').default;
       setNav(() => N);

@@ -1,4 +1,6 @@
 import Svg, { Path, Rect, Defs, LinearGradient, Stop, Text as SvgText } from 'react-native-svg';
+import { Image } from 'react-native';
+import { COLORS } from '../constants';
 
 // Logo BlueTube.
 // - variant 'inline' (default): [▶] BlueTube em uma unica linha (compacto).
@@ -12,6 +14,17 @@ export default function LogoBlueTube({
   variant = 'inline',
   tagline = false, // eslint-disable-line no-unused-vars
 }) {
+  // TEMA CLARO (user 2026-07-24): o nome do logo SVG é branco e some no
+  // fundo claro — usa o PNG dedicado 'logo para fundo branco'.
+  if (COLORS.mode === 'light') {
+    return (
+      <Image
+        source={require('../../assets/logo para fundo branco.png')}
+        style={{ width, height }}
+        resizeMode="contain"
+      />
+    );
+  }
   if (variant === 'stacked') {
     // viewBox 260x130 — play box 120x120 a esquerda, textos empilhados a direita
     // (height ajustado de 150 -> 130 ja que tagline foi removida)

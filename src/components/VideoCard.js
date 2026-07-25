@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions, Share, Animated, Pressable, PanResponder } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions, Share, Animated, Pressable, PanResponder, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Video, ResizeMode } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -33,7 +33,7 @@ function pickResizeMode(w, h) {
   return aspect < 0.85 ? ResizeMode.COVER : ResizeMode.CONTAIN;
 }
 
-export default function VideoCard({ video, index, cardHeight, activeOverride }) {
+export default function VideoCard({ video, index, cardHeight, activeOverride, nearActive }) {
   const currentIndex = useFeedStore((s) => s.currentIndex);
   const appActive = useFeedStore((s) => s.appActive);
   // Mute GLOBAL: silenciar um video vale pra todos os seguintes (antes era
@@ -50,6 +50,13 @@ export default function VideoCard({ video, index, cardHeight, activeOverride }) 
   const baseActive = typeof activeOverride === 'boolean' ? activeOverride : currentIndex === index;
   const [pausedManually, setPausedManually] = useState(false);
   const isActive = baseActive && isFocused && appActive !== false && !pausedManually;
+  // PERF INSTAGRAM (user 2026-07-24, "trava ao rolar / não reproduz"): o
+  // PLAYER só monta perto do ativo (ativo ±1). Longe = thumbnail leve.
+  // Antes TODO card montava um <Video> → N players carregando juntos no
+  // scroll = jank + ExoPlayer esgotado no Android (parava de reproduzir).
+  const montaPlayer = typeof nearActive === 'boolean'
+    ? nearActive
+    : (typeof activeOverride === 'boolean' ? activeOverride : Math.abs((currentIndex ?? 0) - index) <= 1);
   const videoRef = useRef(null);
   const nav = useNavigation();
   const { width: W } = useWindowDimensions();
@@ -255,16 +262,22 @@ export default function VideoCard({ video, index, cardHeight, activeOverride }) 
         onLongPress={handleLongPress}
         delayLongPress={LONG_PRESS_MS}
         style={StyleSheet.absoluteFill}>
-        <Video
-          ref={videoRef}
-          source={{ uri: video.video_url }}
-          style={StyleSheet.absoluteFill}
-          resizeMode={fitMode}
-          isLooping
-          shouldPlay={isActive}
-          isMuted={muted}
-          onLoad={handleVideoLoad}
-        />
+        {montaPlayer ? (
+          <Video
+            ref={videoRef}
+            source={{ uri: video.video_url }}
+            style={StyleSheet.absoluteFill}
+            resizeMode={fitMode}
+            isLooping
+            shouldPlay={isActive}
+            isMuted={muted}
+            onLoad={handleVideoLoad}
+          />
+        ) : video.thumbnail_url ? (
+          <Image source={{ uri: video.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        ) : (
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
+        )}
       </Pressable>
 
       <LinearGradient

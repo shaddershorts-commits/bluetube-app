@@ -43,9 +43,27 @@ export default function LoginScreen({ navigation, route }) {
     if (mode === 'signup' && password.length < 6) { setError('A senha precisa ter ao menos 6 caracteres'); return; }
     setLoading(true); setError('');
     try {
-      const d = mode === 'signin' ? await blueAPI.signin(email, password) : await blueAPI.signup(email, password);
+      // SIGNIN: direto no Supabase (sessão COMPLETA com refresh_token — o
+      // /api/auth do site não devolve o refresh e o app deslogava em 1h).
+      // "Email not confirmed" cai pro fluxo OTP do site (mantido).
+      let d;
+      if (mode === 'signin') {
+        const { signinDirect } = require('../api');
+        d = await signinDirect(email, password);
+        if (d?.error && /email.*confirm|not.confirmed/i.test(String(d.error))) {
+          d = await blueAPI.signin(email, password); // gera OTP custom no site
+          if (d?.needsOTP) {
+            await SecureStore.setItemAsync(EMAIL_KEY, email).catch(() => {});
+            navigation.replace('OTP', { email });
+            setLoading(false);
+            return;
+          }
+        }
+      } else {
+        d = await blueAPI.signup(email, password);
+      }
       const token = d.session?.access_token || d.access_token;
-      const refresh = d.session?.refresh_token;
+      const refresh = d.session?.refresh_token || d.refresh_token;
 
       // Erro explicito do backend
       if (d.error) {
@@ -274,7 +292,7 @@ const styles = StyleSheet.create({
   },
   inputWrapFocus: { borderColor: 'rgba(0,170,255,0.6)' },
   inputIcon: { marginRight: 10 },
-  input: { flex: 1, paddingVertical: 14, color: '#fff', fontSize: 15 },
+  input: { flex: 1, paddingVertical: 14, color: COLORS.text, fontSize: 15 },
   eye: { padding: 6 },
   btnWrap: { borderRadius: 14, marginTop: 8, shadowColor: COLORS.accent, shadowOpacity: 0.4, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 6 },
   btn: { paddingVertical: 16, borderRadius: 14, alignItems: 'center' },

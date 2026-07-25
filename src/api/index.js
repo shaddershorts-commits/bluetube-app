@@ -41,6 +41,33 @@ export async function refreshSession(refreshToken) {
     }
 }
 
+// LOGIN DIRETO no Supabase Auth (fix RAIZ do "desloga ao abrir", 2026-07-24):
+// o /api/auth signin do site retorna session SÓ com access_token — o
+// refresh_token NUNCA chegava no app → sem renovação → deslogava em 1h.
+// O grant direto devolve a sessão COMPLETA (access + refresh + user).
+// auth.js do site segue intocado (regra de ouro).
+export async function signinDirect(email, password) {
+    try {
+        const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+            method: 'POST',
+            headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email, password }),
+        });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) {
+            const msg = d.error_description || d.msg || d.error || 'Credenciais inválidas';
+            return { error: msg };
+        }
+        return { access_token: d.access_token, refresh_token: d.refresh_token, user: d.user };
+    } catch (e) {
+        return { error: e.message || 'network_error' };
+    }
+}
+
 async function api(endpoint, options = {}) {
     const url = `${API_BASE}/${endpoint}`;
     const method = options.method || 'GET';
@@ -303,6 +330,11 @@ export const blueAPI = {
     },
 
     // Chat
+    chatUnreadCount: async () => {
+          const token = await getToken();
+          if (!token) return { count: 0 };
+          return api(`blue-chat?action=unread-count&token=${encodeURIComponent(token)}`);
+    },
     conversas: async () => {
           const token = await getToken();
           return api(`blue-chat?action=conversations&token=${encodeURIComponent(token)}`);
