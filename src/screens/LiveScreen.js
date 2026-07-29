@@ -6,7 +6,7 @@ export default function LiveScreen({ route }) {
   const { live_id } = route.params || {};
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
-      <Header title="Ao vivo" showBack />
+      <Header title="Ao vivo" showBack dark />
       <View style={styles.center}>
         <Text style={styles.icon}>🔴</Text>
         <Text style={styles.text}>Lives estão em desenvolvimento</Text>

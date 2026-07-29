@@ -10,9 +10,15 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import Header from '../components/Header';
+import ErrorBoundary from '../components/ErrorBoundary';
 import blueAPI from '../api';
 import { COLORS } from '../constants';
 import { useT } from '../i18n';
+
+// Tudo que vai pra dentro de <Text> passa por aqui. Objeto/array/null viram
+// string vazia em vez de estourar "Objects are not valid as a React child",
+// que é erro de RENDER (derruba a árvore, não cai em try/catch).
+const txt = (v) => (v == null || typeof v === 'object' ? '' : String(v));
 
 const GAP = 2;
 
@@ -40,22 +46,28 @@ export default function DiscoverScreen() {
   const [resultados, setResultados] = useState(null); // null = sem busca ativa
   const buscaDeb = useRef(null);
   const buscaSeq = useRef(0);
-  const onBusca = (txt) => {
-    setBusca(txt);
+  // Dispara a busca de fato. `imediato` pula o debounce — usado pelo botão
+  // "Buscar" e pela tecla de busca do teclado (antes só existia o debounce,
+  // então apertar buscar não fazia nada visível).
+  const runBusca = (raw, imediato = false) => {
     if (buscaDeb.current) clearTimeout(buscaDeb.current);
-    const q = String(txt || '').trim();
+    const q = String(raw || '').trim();
     if (!q) { setResultados(null); setBuscando(false); return; }
     setBuscando(true);
     const seq = ++buscaSeq.current;
-    buscaDeb.current = setTimeout(() => {
+    const exec = () => {
       const isTag = q.startsWith('#');
       const termo = isTag ? q.slice(1).trim() : q;
       Promise.resolve()
         .then(() => (termo ? blueAPI.busca(termo) : null))
         .then((d) => {
           if (seq !== buscaSeq.current) return; // resposta velha: descarta
-          const usuarios = Array.isArray(d?.usuarios) ? d.usuarios.filter((u) => u && u.user_id) : [];
-          const hashtags = Array.isArray(d?.hashtags) ? d.hashtags.filter((t2) => t2 && t2.nome) : [];
+          const usuarios = Array.isArray(d?.usuarios)
+            ? d.usuarios.filter((u) => u && typeof u === 'object' && u.user_id)
+            : [];
+          const hashtags = Array.isArray(d?.hashtags)
+            ? d.hashtags.filter((t2) => t2 && typeof t2 === 'object' && t2.nome)
+            : [];
           setResultados(isTag ? { usuarios: [], hashtags, soTag: true } : { usuarios, hashtags });
           setBuscando(false);
         })
@@ -64,7 +76,23 @@ export default function DiscoverScreen() {
           setResultados({ usuarios: [], hashtags: [] });
           setBuscando(false);
         });
-    }, 350);
+    };
+    if (imediato) exec();
+    else buscaDeb.current = setTimeout(exec, 350);
+  };
+
+  const onBusca = (valor) => {
+    setBusca(valor);
+    runBusca(valor, false);
+  };
+
+  const limparBusca = () => {
+    if (buscaDeb.current) clearTimeout(buscaDeb.current);
+    buscaSeq.current++;
+    setBusca('');
+    setResultados(null);
+    setBuscando(false);
+    Keyboard.dismiss();
   };
 
   const cardW = (W - GAP * 4) / 3;
@@ -129,25 +157,40 @@ export default function DiscoverScreen() {
     <View style={{ flex: 1, backgroundColor: COLORS.background }}>
       <Header title={t('discover_title')} />
       {/* barra de pesquisa: acha perfis por nome/@ (user 2026-07-24) */}
-      <View style={styles.searchWrap}>
-        <Ionicons name="search" size={16} color="rgba(200,225,255,0.45)" />
-        <TextInput
-          style={styles.searchInput}
-          value={busca}
-          onChangeText={onBusca}
-          placeholder="Buscar perfis e criadores…"
-          placeholderTextColor="rgba(200,225,255,0.35)"
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="search"
-        />
-        {busca ? (
-          <TouchableOpacity onPress={() => { setBusca(''); setResultados(null); Keyboard.dismiss(); }}>
-            <Ionicons name="close-circle" size={18} color="rgba(200,225,255,0.45)" />
+      <View style={styles.searchRow}>
+        <View style={styles.searchWrap}>
+          <Ionicons name="search" size={16} color={COLORS.textSecondary} />
+          <TextInput
+            style={styles.searchInput}
+            value={busca}
+            onChangeText={onBusca}
+            placeholder="Buscar perfis e criadores…"
+            placeholderTextColor={COLORS.textDim}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+            onSubmitEditing={() => runBusca(busca, true)}
+          />
+          {busca ? (
+            <TouchableOpacity onPress={limparBusca} hitSlop={8}>
+              <Ionicons name="close-circle" size={18} color={COLORS.textSecondary} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+        {busca.trim() ? (
+          <TouchableOpacity
+            style={styles.searchBtn}
+            activeOpacity={0.85}
+            onPress={() => { Keyboard.dismiss(); runBusca(busca, true); }}>
+            <Text style={styles.searchBtnText}>Buscar</Text>
           </TouchableOpacity>
         ) : null}
       </View>
       {resultados !== null ? (
+        // Boundary local: se uma linha de resultado quebrar no render, o erro
+        // fica CONTIDO aqui (retry limpa a busca) em vez de derrubar o app
+        // inteiro pelo boundary raiz — que era o "tentar novamente reinicia".
+        <ErrorBoundary compact scope="DiscoverScreen/busca" context={{ query: busca }} onReset={limparBusca}>
         <FlatList
           data={[
             ...(resultados.hashtags || []).map((t2, i) => ({ _k: 'h' + String(t2.id ?? t2.nome ?? i), tipo: 'hashtag', item: t2 })),
@@ -166,32 +209,33 @@ export default function DiscoverScreen() {
                     <Text style={{ color: COLORS.neon, fontSize: 18, fontWeight: '800' }}>#</Text>
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={styles.userName} numberOfLines={1}>#{String(tg.nome || '')}</Text>
-                    <Text style={styles.userDisplay}>{String(tg.usos || 0)} vídeos</Text>
+                    <Text style={styles.userName} numberOfLines={1}>#{txt(tg.nome)}</Text>
+                    <Text style={styles.userDisplay}>{txt(tg.usos) || '0'} vídeos</Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={16} color="rgba(200,225,255,0.3)" />
+                  <Ionicons name="chevron-forward" size={16} color={COLORS.textDim} />
                 </TouchableOpacity>
               );
             }
             const u = row.item;
+            const avatar = typeof u.avatar_url === 'string' && u.avatar_url ? u.avatar_url : null;
             return (
               <TouchableOpacity style={styles.userRow} activeOpacity={0.7}
                 onPress={() => { Keyboard.dismiss(); nav.navigate('PerfilUsuario', { user_id: u.user_id }); }}>
-                {u.avatar_url ? (
-                  <Image source={{ uri: u.avatar_url }} style={styles.userAvatar} />
+                {avatar ? (
+                  <Image source={{ uri: avatar }} style={styles.userAvatar} />
                 ) : (
                   <View style={[styles.userAvatar, styles.userAvatarPh]}>
-                    <Ionicons name="person" size={18} color="rgba(200,225,255,0.4)" />
+                    <Ionicons name="person" size={18} color={COLORS.textSecondary} />
                   </View>
                 )}
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Text style={styles.userName} numberOfLines={1}>@{String(u.username || '')}</Text>
+                    <Text style={styles.userName} numberOfLines={1}>@{txt(u.username)}</Text>
                     {u.verificado ? <Ionicons name="checkmark-circle" size={14} color={COLORS.neon} /> : null}
                   </View>
-                  {u.display_name ? <Text style={styles.userDisplay} numberOfLines={1}>{String(u.display_name)}</Text> : null}
+                  {txt(u.display_name) ? <Text style={styles.userDisplay} numberOfLines={1}>{txt(u.display_name)}</Text> : null}
                 </View>
-                <Ionicons name="chevron-forward" size={16} color="rgba(200,225,255,0.3)" />
+                <Ionicons name="chevron-forward" size={16} color={COLORS.textDim} />
               </TouchableOpacity>
             );
           }}
@@ -201,6 +245,7 @@ export default function DiscoverScreen() {
               : <Text style={styles.empty}>{busca.startsWith('#') ? 'Nenhuma hashtag encontrada' : 'Nenhum perfil encontrado'}</Text>
           }
         />
+        </ErrorBoundary>
       ) : (
       <FlatList
         ref={gridRef}
@@ -244,13 +289,22 @@ const styles = StyleSheet.create({
   badgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
   empty: { color: COLORS.textSecondary, padding: 40, textAlign: 'center', fontSize: 13 },
   // busca de perfis
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginBottom: 8 },
   searchWrap: {
+    flex: 1,
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    marginHorizontal: 12, marginBottom: 8, paddingHorizontal: 12,
+    paddingHorizontal: 12,
     backgroundColor: COLORS.surface, borderWidth: 1,
     borderColor: COLORS.border, borderRadius: 12, height: 42,
   },
+  // Texto digitado SEMPRE em COLORS.text (preto no tema claro). O ícone e o
+  // placeholder eram rgba(200,225,255,…) fixos = invisíveis no fundo branco.
   searchInput: { flex: 1, color: COLORS.text, fontSize: 14, paddingVertical: 0 },
+  searchBtn: {
+    height: 42, paddingHorizontal: 16, borderRadius: 12,
+    backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center',
+  },
+  searchBtnText: { color: '#fff', fontSize: 13.5, fontWeight: '700' },
   userRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingHorizontal: 14, paddingVertical: 10,

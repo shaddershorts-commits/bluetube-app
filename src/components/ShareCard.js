@@ -5,7 +5,9 @@ import { View, Text, TouchableOpacity, Image, StyleSheet, ActivityIndicator } fr
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import blueAPI from '../api';
-import { COLORS_DARK as COLORS } from '../constants';
+// Segue o tema: o card mora DENTRO da bolha do chat, que fica branca no modo
+// claro. Com COLORS_DARK o título saía '#fff' sobre bolha branca = invisível.
+import { COLORS } from '../constants';
 
 const cache = {}; // videoId -> video (evita refetch a cada render)
 
@@ -52,12 +54,12 @@ export default function ShareCard({ videoId }) {
 }
 
 const styles = StyleSheet.create({
-  card: { width: 220, borderRadius: 14, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.06)' },
+  card: { width: 220, borderRadius: 14, overflow: 'hidden', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
   thumb: { width: '100%', height: 260, backgroundColor: 'rgba(0,0,0,0.3)' },
   playBadge: { position: 'absolute', top: 110, alignSelf: 'center', width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
   info: { padding: 10 },
-  title: { color: '#fff', fontSize: 13, fontWeight: '700', lineHeight: 17 },
-  creator: { color: COLORS.textDim, fontSize: 11, marginTop: 3 },
+  title: { color: COLORS.text, fontSize: 13, fontWeight: '700', lineHeight: 17 },
+  creator: { color: COLORS.textSecondary, fontSize: 11, marginTop: 3 },
   center: { alignItems: 'center', justifyContent: 'center', minHeight: 80 },
   gone: { color: COLORS.textDim, fontSize: 12.5, padding: 12 },
 });

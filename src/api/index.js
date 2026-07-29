@@ -304,6 +304,18 @@ export const blueAPI = {
           if (!token) return { following: false };
           return api(`blue-follow?action=is-following&user_id=${encodeURIComponent(user_id)}&token=${encodeURIComponent(token)}`);
     },
+    // Listas de seguidores / seguindo (paginadas, 30 por página).
+    // O token é obrigatório: a lista de OUTRA pessoa só vem se ela me
+    // adicionou nos contatos do BlueChat — senão o backend devolve
+    // { usuarios: [], total, bloqueado: true }. O total é sempre público.
+    listaSeguidores: async (user_id, pagina = 1) => {
+          const token = await getToken();
+          return api(`blue-follow?action=lista-seguidores&user_id=${encodeURIComponent(user_id)}&pagina=${pagina}&token=${encodeURIComponent(token || '')}`);
+    },
+    listaSeguindo: async (user_id, pagina = 1) => {
+          const token = await getToken();
+          return api(`blue-follow?action=lista-seguindo&user_id=${encodeURIComponent(user_id)}&pagina=${pagina}&token=${encodeURIComponent(token || '')}`);
+    },
     // TODO: blue-profile.js precisa ter action=sugestoes-seguir
     sugestoesSeguir: async () => {
           const token = await getToken();
@@ -444,28 +456,44 @@ export const blueAPI = {
           const token = await getToken();
           return api('blue-stories', { method: 'POST', body: JSON.stringify({ action: 'deletar', token, story_id }) });
     },
-    // Cria story: sobe a midia direto pro bucket blue-stories (mesmo fluxo
-    // do site) e registra via action=criar. tipo: 'imagem' | 'video'.
+    // Cria story: sobe a midia pro Storage e registra via action=criar.
+    // tipo: 'imagem' | 'video'.
+    //
+    // FIX 2026-07-29 ("Falha no upload HTTP 400" ao postar storie/status):
+    // duas coisas erradas de uma vez —
+    //   1) autenticava com a ANON KEY (`Bearer <anon>`), papel que NAO tem
+    //      permissao de INSERT no Storage => 400 em toda tentativa. Verificado
+    //      em prod: POST com anon key retorna 400 e o bucket blue-stories esta
+    //      VAZIO (nenhum story jamais subiu, nem pelo site).
+    //   2) o path era `stories/<8 primeiros chars do JWT>/...` — e os 8
+    //      primeiros chars de um JWT sao "eyJhbGci" pra TODO MUNDO, entao nem
+    //      batia com policy por dono.
+    // Agora usa o MESMO caminho ja provado do upload de video/midia do chat:
+    // token do usuario + bucket blue-videos + prefixo `<sub do JWT>/`.
     storyCriar: async (mediaUri, { tipo = 'imagem', duracao, mime, audience } = {}) => {
           const token = await getToken();
           if (!token) return { error: 'Login necessario' };
           try {
+                let sub = null;
+                try { sub = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).sub || null; } catch (_) {}
+                if (!sub) return { error: 'Sessao invalida — entra de novo no app.' };
                 const ext = tipo === 'video' ? 'mp4' : 'jpg';
-                const fname = Date.now() + '.' + ext;
-                const pathStorage = 'stories/' + token.substring(0, 8) + '/' + fname;
-                const url = `${SUPABASE_URL}/storage/v1/object/blue-stories/${pathStorage}`;
+                const pathStorage = sub + '/stories/' + Date.now() + '.' + ext;
+                const url = `${SUPABASE_URL}/storage/v1/object/blue-videos/${pathStorage}`;
                 const up = await FileSystem.uploadAsync(url, mediaUri, {
                       httpMethod: 'POST',
                       uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
                       headers: {
                             apikey: SUPABASE_ANON_KEY,
-                            Authorization: 'Bearer ' + SUPABASE_ANON_KEY,
+                            Authorization: 'Bearer ' + token,
                             'Content-Type': mime || (tipo === 'video' ? 'video/mp4' : 'image/jpeg'),
                             'x-upsert': 'true',
                       },
                 });
-                if (up.status >= 400) return { error: 'Falha no upload do story (HTTP ' + up.status + ')' };
-                const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/blue-stories/${pathStorage}`;
+                if (up.status >= 400) {
+                      return { error: 'Falha no upload do story (HTTP ' + up.status + '). Tenta de novo em instantes.' };
+                }
+                const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/blue-videos/${pathStorage}`;
                 return api('blue-stories', {
                       method: 'POST',
                       body: JSON.stringify({ action: 'criar', token, tipo, media_url: publicUrl, duracao: duracao || (tipo === 'video' ? 15 : 5), audience: audience || 'stories' }),

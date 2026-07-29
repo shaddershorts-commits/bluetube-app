@@ -8,20 +8,26 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { colors, blur as blurT, fontSize, fontWeight } from '../constants/theme';
 
-export default function Header({ title, showBack, right }) {
+// `dark`: força a barra escura mesmo no tema claro. Serve pras telas que são
+// pretas por natureza (live/player) — ali um header claro ficaria uma faixa
+// branca no topo do preto.
+export default function Header({ title, showBack, right, dark = false }) {
   const nav = useNavigation();
+  const tint = dark ? 'dark' : colors.glassTint;
+  const veu = dark ? 'rgba(10,22,40,0.55)' : colors.glassDark;
+  const corTexto = dark ? '#e8f4ff' : colors.text;
   return (
     <View style={styles.wrap}>
-      <BlurView intensity={blurT.medium} tint="dark" style={StyleSheet.absoluteFill} />
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.glassDark }]} pointerEvents="none" />
+      <BlurView intensity={blurT.medium} tint={tint} style={StyleSheet.absoluteFill} />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: veu }]} pointerEvents="none" />
       <SafeAreaView edges={['top']}>
         <View style={styles.container}>
           {showBack ? (
             <TouchableOpacity onPress={() => nav.goBack()} style={styles.btn} hitSlop={8}>
-              <Ionicons name="arrow-back" color={colors.text} size={24} />
+              <Ionicons name="arrow-back" color={corTexto} size={24} />
             </TouchableOpacity>
           ) : <View style={styles.btn} />}
-          <Text style={styles.title} numberOfLines={1}>{title}</Text>
+          <Text style={[styles.title, { color: corTexto }]} numberOfLines={1}>{title}</Text>
           <View style={styles.btn}>{right}</View>
         </View>
       </SafeAreaView>

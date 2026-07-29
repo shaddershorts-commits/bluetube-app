@@ -19,7 +19,7 @@ import { colors, radius, blur as blurT, space } from '../constants/theme';
 export default function GlassCard({
   children,
   intensity = blurT.medium,
-  tint = 'dark',
+  tint = colors.glassTint, // segue o modo claro/escuro (era 'dark' fixo)
   tone = 'glass',
   padded = true,
   bordered = true,

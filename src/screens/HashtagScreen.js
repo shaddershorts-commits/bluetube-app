@@ -21,7 +21,12 @@ export default function HashtagScreen() {
   const nav = useNavigation();
   const route = useRoute();
   const { width: W } = useWindowDimensions();
-  const tag = decodeURIComponent(route.params?.tag || '');
+  // decodeURIComponent JOGA URIError em '%' solto (ex.: hashtag "100%") e isso
+  // é erro de render = tela branca/boundary. A busca passa a tag CRUA, então
+  // decodifica só quando dá certo.
+  const rawTag = String(route.params?.tag || '');
+  let tag = rawTag;
+  try { tag = decodeURIComponent(rawTag); } catch (e) { tag = rawTag; }
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);

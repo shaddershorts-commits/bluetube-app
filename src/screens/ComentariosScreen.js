@@ -233,8 +233,8 @@ export default function ComentariosScreen({ route }) {
 
 const styles = StyleSheet.create({
   item: { flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 10, gap: 10, alignItems: 'flex-start' },
-  itemReply: { paddingLeft: 40, backgroundColor: 'rgba(255,255,255,0.015)' },
-  gifComment: { width: 160, height: 160, borderRadius: 12, marginTop: 4, backgroundColor: 'rgba(255,255,255,0.04)' },
+  itemReply: { paddingLeft: 40, backgroundColor: COLORS.chipBg },
+  gifComment: { width: 160, height: 160, borderRadius: 12, marginTop: 4, backgroundColor: COLORS.inputBg },
   emojiBtn: { paddingHorizontal: 4, paddingVertical: 6, alignSelf: 'flex-end' },
   rowTop: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   user: { color: COLORS.neon, fontSize: 12, fontWeight: '700' },

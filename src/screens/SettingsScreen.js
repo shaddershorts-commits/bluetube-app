@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
   pwdHint: { color: COLORS.textSecondary, fontSize: 13, lineHeight: 19, marginBottom: 12, textAlign: 'center' },
   pwdEmailBox: { backgroundColor: 'rgba(0,170,255,0.07)', borderWidth: 1, borderColor: 'rgba(0,170,255,0.2)', borderRadius: 10, padding: 12, marginBottom: 14 },
   pwdEmail: { color: COLORS.neon, fontSize: 14, fontWeight: '700', textAlign: 'center' },
-  pwdInput: { backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(0,170,255,0.2)', borderRadius: 10, color: COLORS.text, fontSize: 15, paddingHorizontal: 12, paddingVertical: 11, marginBottom: 12 },
+  pwdInput: { backgroundColor: COLORS.inputBg, borderWidth: 1, borderColor: COLORS.border, borderRadius: 10, color: COLORS.text, fontSize: 15, paddingHorizontal: 12, paddingVertical: 11, marginBottom: 12 },
   pwdOtp: { textAlign: 'center', fontSize: 24, letterSpacing: 10, fontWeight: '800' },
   pwdRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   pwdEye: { padding: 8 },

@@ -286,7 +286,7 @@ export default function ChatScreen() {
           }
         />
       ) : (
-        <ChamadasTeaser />
+        <ChamadasTeaser T={T} />
       )}
 
       {/* FAB: conversas = adicionar usuário · status = postar */}
@@ -391,7 +391,9 @@ const mkStyles = (T) => StyleSheet.create({
 
 // ── Teaser animado da aba Chamadas (user 2026-07-24): mostra o que a aba
 // vai virar — anéis pulsando estilo "ligação chegando" + recursos previstos.
-function ChamadasTeaser() {
+// Recebe T (paleta do modo) — os textos eram '#e8f4ff' / rgba(200,225,255,…)
+// fixos, ou seja, brancos sobre o fundo branco do tema claro = sumiam.
+function ChamadasTeaser({ T }) {
   const ring1 = useRef(new Animated.Value(0)).current;
   const ring2 = useRef(new Animated.Value(0)).current;
   const shake = useRef(new Animated.Value(0)).current;
@@ -423,7 +425,7 @@ function ChamadasTeaser() {
 
   const ringStyle = (v) => ({
     position: 'absolute', width: 120, height: 120, borderRadius: 60,
-    borderWidth: 2, borderColor: '#00aaff',
+    borderWidth: 2, borderColor: T.accent,
     opacity: v.interpolate({ inputRange: [0, 0.7, 1], outputRange: [0.55, 0.18, 0] }),
     transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1.9] }) }],
   });
@@ -435,25 +437,25 @@ function ChamadasTeaser() {
         <Animated.View style={ringStyle(ring2)} />
         <Animated.View style={{
           width: 92, height: 92, borderRadius: 46, alignItems: 'center', justifyContent: 'center',
-          backgroundColor: 'rgba(0,170,255,0.14)', borderWidth: 1, borderColor: 'rgba(0,170,255,0.45)',
+          backgroundColor: T.accent + '24', borderWidth: 1, borderColor: T.accent + '73',
           transform: [{ rotate: shake.interpolate({ inputRange: [-8, 8], outputRange: ['-8deg', '8deg'] }) }],
         }}>
           <Text style={{ fontSize: 40 }}>📞</Text>
         </Animated.View>
       </View>
       <Animated.View style={{ opacity: fade, alignItems: 'center' }}>
-        <Text style={{ color: '#e8f4ff', fontSize: 20, fontWeight: '800', marginBottom: 8 }}>Chamadas estão chegando</Text>
-        <Text style={{ color: 'rgba(200,225,255,0.65)', fontSize: 13.5, textAlign: 'center', lineHeight: 20, marginBottom: 18 }}>
+        <Text style={{ color: T.text, fontSize: 20, fontWeight: '800', marginBottom: 8, fontFamily: T.font }}>Chamadas estão chegando</Text>
+        <Text style={{ color: T.textSecondary, fontSize: 13.5, textAlign: 'center', lineHeight: 20, marginBottom: 18, fontFamily: T.font }}>
           Muito em breve você vai poder ligar pros seus contatos direto daqui:
         </Text>
-        {[['🎙️', 'Chamadas de voz com seus contatos'], ['📹', 'Chamadas de vídeo 1:1'], ['🔒', 'Direto do chat, com quem você já conversa']].map(([ic, txt]) => (
-          <View key={txt} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+        {[['🎙️', 'Chamadas de voz com seus contatos'], ['📹', 'Chamadas de vídeo 1:1'], ['🔒', 'Direto do chat, com quem você já conversa']].map(([ic, label]) => (
+          <View key={label} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
             <Text style={{ fontSize: 17 }}>{ic}</Text>
-            <Text style={{ color: 'rgba(220,238,255,0.85)', fontSize: 13.5 }}>{txt}</Text>
+            <Text style={{ color: T.text, fontSize: 13.5, fontFamily: T.font }}>{label}</Text>
           </View>
         ))}
-        <View style={{ marginTop: 14, backgroundColor: 'rgba(0,170,255,0.12)', borderWidth: 1, borderColor: 'rgba(0,170,255,0.35)', borderRadius: 100, paddingHorizontal: 16, paddingVertical: 7 }}>
-          <Text style={{ color: '#4fc3ff', fontSize: 11.5, fontWeight: '700', letterSpacing: 0.6 }}>EM DESENVOLVIMENTO ✨</Text>
+        <View style={{ marginTop: 14, backgroundColor: T.accent + '1f', borderWidth: 1, borderColor: T.accent + '59', borderRadius: 100, paddingHorizontal: 16, paddingVertical: 7 }}>
+          <Text style={{ color: T.accent, fontSize: 11.5, fontWeight: '700', letterSpacing: 0.6 }}>EM DESENVOLVIMENTO ✨</Text>
         </View>
       </Animated.View>
     </View>

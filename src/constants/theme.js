@@ -10,7 +10,8 @@
 //   import { COLORS } from '../constants';
 // ───────────────────────────────────────────────────────────────────────────
 
-export const colors = {
+// Paleta ESCURA (padrao historico do app)
+const DARK_TOKENS = {
   // Backgrounds
   bg:           '#020817',                          // negro azulado profundo (raiz)
   bgSecondary:  '#0a1628',                          // surface escuro
@@ -21,6 +22,7 @@ export const colors = {
   glassLight:   'rgba(255, 255, 255, 0.04)',        // hover sutil em items
   glassAccent:  'rgba(0, 170, 255, 0.08)',          // tom azul Blue sutil
   glassPress:   'rgba(255, 255, 255, 0.10)',        // press feedback em botoes glass
+  glassTint:    'dark',                             // prop `tint` do BlurView
 
   // Text
   text:         '#e8f4ff',                          // primario
@@ -44,7 +46,49 @@ export const colors = {
   border:       'rgba(255, 255, 255, 0.08)',        // borda padrao escura
   borderActive: 'rgba(0, 170, 255, 0.4)',           // borda focus
   borderGlass:  'rgba(255, 255, 255, 0.12)',        // borda glass (Apple-style — branca translucida)
+
+  mode:         'dark',
 };
+
+// Paleta CLARA — espelha os MESMOS nomes (auditoria tema claro 2026-07-29).
+// Sem isto, todo consumidor de `colors` (Header, GlassCard, GlassButton, menu
+// do Perfil, Analytics, popup de boas-vindas, tab bar) ficava escuro com texto
+// claro sobre fundo claro do app => "letra branca no fundo branco".
+const LIGHT_TOKENS = {
+  ...DARK_TOKENS,
+  bg:           '#eef3fa',
+  bgSecondary:  '#ffffff',
+  bgRaised:     '#ffffff',
+
+  glassDark:    'rgba(255, 255, 255, 0.82)',        // "vidro" claro
+  glassLight:   'rgba(11, 21, 38, 0.04)',
+  glassAccent:  'rgba(26, 107, 255, 0.07)',
+  glassPress:   'rgba(11, 21, 38, 0.08)',
+  glassTint:    'light',
+
+  text:         '#0b1526',
+  textDim:      'rgba(11, 21, 38, 0.62)',
+  textMuted:    'rgba(11, 21, 38, 0.42)',
+  textDisabled: 'rgba(11, 21, 38, 0.25)',
+
+  neon:         '#1a6bff',
+
+  border:       'rgba(11, 21, 38, 0.10)',
+  borderActive: 'rgba(26, 107, 255, 0.45)',
+  borderGlass:  'rgba(26, 107, 255, 0.22)',
+
+  mode:         'light',
+};
+
+// `colors` é MUTÁVEL de propósito: applyMode() (constants/index.js) reescreve
+// as chaves ANTES das telas serem importadas, então cada StyleSheet.create
+// nasce com a paleta certa. Trocar de modo em runtime = salvar + reload do JS.
+export const colors = { ...DARK_TOKENS };
+
+export function applyThemeTokens(mode) {
+  const alvo = mode === 'light' ? LIGHT_TOKENS : DARK_TOKENS;
+  for (const k of Object.keys(alvo)) colors[k] = alvo[k];
+}
 
 // SPACING (escala 8px)
 export const space = {

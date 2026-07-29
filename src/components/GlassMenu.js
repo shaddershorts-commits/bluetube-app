@@ -12,7 +12,7 @@ export default function GlassMenu({ visible, title, subtitle, options = [], onCl
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.sheetWrap} onPress={(e) => e.stopPropagation()}>
-          <BlurView intensity={50} tint={COLORS.mode === 'light' ? 'light' : 'dark'} style={styles.sheet}>
+          <BlurView intensity={50} tint={COLORS.glassTint} style={styles.sheet}>
             <View style={styles.handle} />
             {title ? <Text style={styles.title} numberOfLines={1}>{title}</Text> : null}
             {subtitle ? <Text style={styles.subtitle} numberOfLines={2}>{subtitle}</Text> : null}
@@ -27,8 +27,8 @@ export default function GlassMenu({ visible, title, subtitle, options = [], onCl
               </TouchableOpacity>
             ))}
             <TouchableOpacity style={[styles.opt, styles.optBorder]} onPress={onClose}>
-              <Ionicons name="close" size={20} color={COLORS.textDim} />
-              <Text style={[styles.optLabel, { color: COLORS.textDim }]}>Cancelar</Text>
+              <Ionicons name="close" size={20} color={COLORS.onGlassDim} />
+              <Text style={[styles.optLabel, { color: COLORS.onGlassDim }]}>Cancelar</Text>
             </TouchableOpacity>
           </BlurView>
         </Pressable>
@@ -37,18 +37,21 @@ export default function GlassMenu({ visible, title, subtitle, options = [], onCl
   );
 }
 
+// Todas as cores saem de COLORS.* (tokens de superfície) — no tema claro o
+// vidro fica claro E o texto escuro. Antes: vidro fixo escuro + optLabel
+// '#e8f0fb' fixo, com title/subtitle em COLORS.text (preto no claro) = sumia.
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(2,8,23,0.55)', justifyContent: 'flex-end' },
+  backdrop: { flex: 1, backgroundColor: COLORS.overlay, justifyContent: 'flex-end' },
   sheetWrap: { padding: 12 },
   sheet: {
     borderRadius: 24, overflow: 'hidden', paddingBottom: 8,
-    borderWidth: 1, borderColor: 'rgba(0,170,255,0.25)',
-    backgroundColor: 'rgba(10,22,40,0.55)',
+    borderWidth: 1, borderColor: COLORS.glassBorder,
+    backgroundColor: COLORS.glassBg,
   },
-  handle: { width: 42, height: 4, borderRadius: 2, backgroundColor: COLORS.textDim, alignSelf: 'center', marginTop: 10 },
-  title: { color: COLORS.text, fontSize: 15, fontWeight: '800', textAlign: 'center', marginTop: 10, paddingHorizontal: 20 },
-  subtitle: { color: COLORS.textDim, fontSize: 11.5, textAlign: 'center', marginTop: 2, paddingHorizontal: 20 },
+  handle: { width: 42, height: 4, borderRadius: 2, backgroundColor: COLORS.onGlassDim, alignSelf: 'center', marginTop: 10 },
+  title: { color: COLORS.onGlass, fontSize: 15, fontWeight: '800', textAlign: 'center', marginTop: 10, paddingHorizontal: 20 },
+  subtitle: { color: COLORS.onGlassDim, fontSize: 11.5, textAlign: 'center', marginTop: 2, paddingHorizontal: 20 },
   opt: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 15, paddingHorizontal: 22, marginTop: 4 },
-  optBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(255,255,255,0.08)' },
-  optLabel: { color: '#e8f0fb', fontSize: 15, fontWeight: '600' },
+  optBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: COLORS.hairline },
+  optLabel: { color: COLORS.onGlass, fontSize: 15, fontWeight: '600' },
 });

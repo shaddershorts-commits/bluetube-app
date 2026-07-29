@@ -3,19 +3,32 @@
 // - Storie → CÂMERA (até 3 min) com opção de galeria abaixo → publica no
 //   Status do BlueChat (mesmo canal do FAB da aba Status)
 // Pills de segundos (15/30/60) REMOVIDAS por pedido do user.
+//
+// Captura estilo Instagram (user 2026-07-29):
+//   toque simples no disparador        → FOTO
+//   segurar 2s                          → começa a GRAVAR (pode soltar o dedo)
+//   toque durante a gravação            → para e vai pro preview
+// A câmera frontal fica ESPELHADA (o que você vê é o que um espelho mostra).
+// A pill de navegação some enquanto a câmera/preview está aberta — ela é
+// `position: absolute` e cobria os botões.
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import {
+  View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Image,
+  DeviceEventEmitter,
+} from 'react-native';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
+import * as Haptics from 'expo-haptics';
 import { Video, ResizeMode } from 'expo-av';
 import { COLORS_DARK as COLORS } from '../constants';
 import blueAPI from '../api';
 
 const VIDEO_MAX_S = 600;   // vídeo postado: até 10 minutos
 const STORIE_MAX_S = 180;  // storie/status: até 3 minutos
+const HOLD_MS = 2000;      // segurar 2s pra começar a gravar
 
 export default function CameraScreen() {
   const nav = useNavigation();
@@ -24,21 +37,61 @@ export default function CameraScreen() {
   const [facing, setFacing] = useState('front');
   const [recording, setRecording] = useState(false);
   const [escolha, setEscolha] = useState(null); // null = chooser | 'storie'
-  const [videoUri, setVideoUri] = useState(null);
+  // preview do que foi capturado: { uri, tipo: 'video' | 'imagem' }
+  const [preview, setPreview] = useState(null);
   const [publicando, setPublicando] = useState(false);
   // ferramentas pré-gravação estilo Instagram (user 2026-07-24)
   const [flashOn, setFlashOn] = useState(false);
   const [timerSec, setTimerSec] = useState(0);        // 0 | 3 | 10
   const [countdown, setCountdown] = useState(null);   // contagem na tela
   const [previewMuted, setPreviewMuted] = useState(false);
+  // 'picture' liga o ImageCapture do CameraX; 'video' liga o VideoCapture.
+  // No modo errado o takePictureAsync nativo é um no-op que NUNCA resolve
+  // (chamada com `?.` num use-case nulo), então a troca é obrigatória.
+  const [camMode, setCamMode] = useState('picture');
   const cameraRef = useRef(null);
+  const recordingRef = useRef(false);
+  const holdTimer = useRef(null);
+  const holdFired = useRef(false);
+  const readyWaiters = useRef([]);
+
+  const naCaptura = escolha === 'storie';
+
+  // Some com a pill de navegação enquanto a câmera/preview está na tela.
+  useEffect(() => {
+    DeviceEventEmitter.emit('bt-tabbar-hide', naCaptura);
+  }, [naCaptura]);
 
   // sempre que a aba ganha foco, volta pro chooser (fluxo limpo a cada entrada)
   useFocusEffect(useCallback(() => {
     setEscolha(null);
-    setVideoUri(null);
-    return () => { try { cameraRef.current?.stopRecording(); } catch (e) {} };
+    setPreview(null);
+    return () => {
+      try { cameraRef.current?.stopRecording(); } catch (e) {}
+      if (holdTimer.current) clearTimeout(holdTimer.current);
+      DeviceEventEmitter.emit('bt-tabbar-hide', false); // sair da aba devolve a pill
+    };
   }, []));
+
+  // ── Sincronia com o rebind nativo da câmera ao trocar picture <-> video ──
+  const onCameraReady = () => {
+    const ws = readyWaiters.current;
+    readyWaiters.current = [];
+    ws.forEach((fn) => { try { fn(); } catch (e) {} });
+  };
+  const esperarCameraPronta = (timeoutMs = 2500) => new Promise((resolve) => {
+    const t = setTimeout(resolve, timeoutMs); // fail-open: nunca trava o botão
+    readyWaiters.current.push(() => { clearTimeout(t); resolve(); });
+  });
+
+  const rodarTemporizador = async () => {
+    if (timerSec <= 0) return;
+    for (let s = timerSec; s > 0; s--) {
+      setCountdown(s);
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+    setCountdown(null);
+  };
 
   // ── VÍDEO: galeria direto → PostVideo (até 10 min, sem limite de tamanho) ──
   const escolherVideo = async () => {
@@ -64,13 +117,23 @@ export default function CameraScreen() {
     setPublicando(true);
     const r = await blueAPI.storyCriar(uri, {
       tipo, mime, audience: 'status',
+      duracao: tipo === 'video' ? 15 : 5,
     }).catch((e) => ({ error: e.message }));
     setPublicando(false);
     if (r?.error) { Alert.alert('Não deu pra postar', r.error); return; }
-    setVideoUri(null);
+    setPreview(null);
     setEscolha(null);
     Alert.alert('✨ Storie publicado!', 'Seus contatos podem ver por 24 horas.');
     nav.navigate('Chat');
+  };
+
+  const publicarPreview = () => {
+    if (!preview) return;
+    publicarStorie(
+      preview.uri,
+      preview.tipo,
+      preview.tipo === 'video' ? 'video/mp4' : 'image/jpeg',
+    );
   };
 
   const storieDaGaleria = async () => {
@@ -91,31 +154,89 @@ export default function CameraScreen() {
     } catch (e) { Alert.alert('Erro', e.message || 'Não deu pra abrir a galeria.'); }
   };
 
-  const startRecording = async () => {
-    if (!cameraRef.current) return;
-    // temporizador (mãos livres, estilo Instagram): 3s/10s de contagem na tela
-    if (timerSec > 0) {
-      for (let s = timerSec; s > 0; s--) {
-        setCountdown(s);
-        await new Promise((r) => setTimeout(r, 1000));
-      }
-      setCountdown(null);
-    }
-    setRecording(true);
+  // ── FOTO (toque simples) ──
+  const tirarFoto = async () => {
+    if (!cameraRef.current || recordingRef.current || publicando) return;
     try {
-      const video = await cameraRef.current.recordAsync({ maxDuration: STORIE_MAX_S });
-      setVideoUri(video.uri);
-      setPreviewMuted(false);
-    } catch (e) { Alert.alert('Erro', e.message); }
-    setRecording(false);
+      await rodarTemporizador();
+      if (camMode !== 'picture') {
+        setCamMode('picture');
+        await esperarCameraPronta();
+      }
+      const foto = await cameraRef.current.takePictureAsync({ quality: 0.9 });
+      if (foto?.uri) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        setPreview({ uri: foto.uri, tipo: 'imagem' });
+      }
+    } catch (e) {
+      setCountdown(null);
+      Alert.alert('Erro', e.message || 'Não deu pra tirar a foto.');
+    }
   };
-  const stopRecording = () => { cameraRef.current?.stopRecording(); };
+
+  // ── VÍDEO (segurar 2s; pode soltar o dedo que continua gravando) ──
+  const iniciarGravacao = async () => {
+    if (!cameraRef.current || recordingRef.current || publicando) return;
+    try {
+      if (!micPerm?.granted) await requestMic();
+      await rodarTemporizador();
+      setCamMode('video');
+      await esperarCameraPronta();
+      recordingRef.current = true;
+      setRecording(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      const video = await cameraRef.current.recordAsync({ maxDuration: STORIE_MAX_S });
+      if (video?.uri) {
+        setPreview({ uri: video.uri, tipo: 'video' });
+        setPreviewMuted(false);
+      }
+    } catch (e) {
+      Alert.alert('Erro', e.message || 'Não deu pra gravar.');
+    } finally {
+      recordingRef.current = false;
+      setRecording(false);
+      setCountdown(null);
+      setCamMode('picture');
+    }
+  };
+
+  const pararGravacao = () => {
+    try { cameraRef.current?.stopRecording(); } catch (e) {}
+  };
+
+  // Disparador: press-in arma o timer de 2s; press-out decide foto x nada.
+  const onDisparoPressIn = () => {
+    if (recordingRef.current) {
+      // Já gravando: este é um toque NOVO, então zera a marca do hold que
+      // iniciou a gravação — sem isso o press-out enxergava holdFired=true
+      // e nunca parava (o botão de parar ficava morto).
+      holdFired.current = false;
+      return;
+    }
+    holdFired.current = false;
+    holdTimer.current = setTimeout(() => {
+      holdFired.current = true;
+      iniciarGravacao();
+    }, HOLD_MS);
+  };
+  const onDisparoPressOut = () => {
+    if (holdTimer.current) { clearTimeout(holdTimer.current); holdTimer.current = null; }
+    if (recordingRef.current) {
+      // se a gravação começou por causa DESTE hold, soltar o dedo NÃO para
+      // (o user pediu pra poder tirar o dedo). Só um toque novo para.
+      if (!holdFired.current) pararGravacao();
+      return;
+    }
+    if (!holdFired.current) tirarFoto();
+  };
+
+  useEffect(() => () => { if (holdTimer.current) clearTimeout(holdTimer.current); }, []);
 
   const descartarPreview = () => {
     // Instagram pergunta antes de jogar fora
-    Alert.alert('Descartar storie?', 'O vídeo gravado vai ser perdido.', [
+    Alert.alert('Descartar storie?', 'O que você capturou vai ser perdido.', [
       { text: 'Continuar editando', style: 'cancel' },
-      { text: 'Descartar', style: 'destructive', onPress: () => setVideoUri(null) },
+      { text: 'Descartar', style: 'destructive', onPress: () => setPreview(null) },
     ]);
   };
 
@@ -167,33 +288,39 @@ export default function CameraScreen() {
     );
   }
 
-  // ── PREVIEW estilo Instagram: o storie TOCA em loop pra REVER antes de
-  // postar (user 2026-07-24). X descarta (com confirmação), 🔊 muta,
+  // ── PREVIEW estilo Instagram: vídeo TOCA em loop / foto fica fixa pra REVER
+  // antes de postar. X descarta (com confirmação), 🔊 muta (vídeo),
   // "Seu storie" (pílula, base-esquerda) e ➤ (base-direita) publicam.
-  if (videoUri) {
+  if (preview) {
     return (
       <View style={styles.container}>
-        <Video
-          source={{ uri: videoUri }}
-          style={StyleSheet.absoluteFill}
-          resizeMode={ResizeMode.COVER}
-          shouldPlay
-          isLooping
-          isMuted={previewMuted}
-        />
+        {preview.tipo === 'video' ? (
+          <Video
+            source={{ uri: preview.uri }}
+            style={StyleSheet.absoluteFill}
+            resizeMode={ResizeMode.COVER}
+            shouldPlay
+            isLooping
+            isMuted={previewMuted}
+          />
+        ) : (
+          <Image source={{ uri: preview.uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        )}
         <SafeAreaView style={styles.header}>
           <TouchableOpacity onPress={descartarPreview} style={styles.iconBtn}>
             <Ionicons name="close" color="#fff" size={28} />
           </TouchableOpacity>
           <View style={{ flex: 1 }} />
-          <TouchableOpacity onPress={() => setPreviewMuted((m) => !m)} style={styles.iconBtn}>
-            <Ionicons name={previewMuted ? 'volume-mute' : 'volume-high'} color="#fff" size={24} />
-          </TouchableOpacity>
+          {preview.tipo === 'video' ? (
+            <TouchableOpacity onPress={() => setPreviewMuted((m) => !m)} style={styles.iconBtn}>
+              <Ionicons name={previewMuted ? 'volume-mute' : 'volume-high'} color="#fff" size={24} />
+            </TouchableOpacity>
+          ) : null}
         </SafeAreaView>
         <View style={styles.previewFooter}>
           <TouchableOpacity
             style={styles.seuStorieBtn}
-            onPress={() => publicarStorie(videoUri, 'video', 'video/mp4')}
+            onPress={publicarPreview}
             disabled={publicando}>
             {publicando ? <ActivityIndicator color="#0a1526" size="small" /> : (
               <>
@@ -205,7 +332,7 @@ export default function CameraScreen() {
           <View style={{ flex: 1 }} />
           <TouchableOpacity
             style={styles.sendFab}
-            onPress={() => publicarStorie(videoUri, 'video', 'video/mp4')}
+            onPress={publicarPreview}
             disabled={publicando}>
             {publicando ? <ActivityIndicator color="#fff" size="small" /> : <Ionicons name="arrow-forward" color="#fff" size={24} />}
           </TouchableOpacity>
@@ -219,14 +346,27 @@ export default function CameraScreen() {
   // centro, virar câmera embaixo-direita.
   return (
     <View style={styles.container}>
-      <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing={facing} mode="video" enableTorch={flashOn && facing === 'back'} />
+      <CameraView
+        ref={cameraRef}
+        style={StyleSheet.absoluteFill}
+        facing={facing}
+        mode={camMode}
+        // Espelha a frontal: o preview (e a captura) ficam como um espelho,
+        // que é o que o usuário espera. Antes saía invertido.
+        mirror={facing === 'front'}
+        flash={flashOn ? 'on' : 'off'}
+        enableTorch={flashOn && facing === 'back' && camMode === 'video'}
+        onCameraReady={onCameraReady}
+      />
 
       <SafeAreaView style={styles.header}>
-        <TouchableOpacity onPress={() => setEscolha(null)} style={styles.iconBtn}>
+        <TouchableOpacity onPress={() => setEscolha(null)} style={styles.iconBtn} disabled={recording}>
           <Ionicons name="close" color="#fff" size={28} />
         </TouchableOpacity>
         <View style={styles.storieBadge}>
-          <Text style={styles.storieBadgeText}>✨ Storie · até 3 min</Text>
+          <Text style={styles.storieBadgeText}>
+            {recording ? '● Gravando…' : '✨ Toque = foto · Segure = vídeo'}
+          </Text>
         </View>
         <View style={{ width: 40 }} />
       </SafeAreaView>
@@ -259,7 +399,9 @@ export default function CameraScreen() {
             <Text style={styles.galleryText}>Galeria</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={recording ? stopRecording : startRecording}
+            activeOpacity={0.85}
+            onPressIn={onDisparoPressIn}
+            onPressOut={onDisparoPressOut}
             style={[styles.recBtn, recording && styles.recBtnActive]}>
             <View style={[styles.recInner, recording && styles.recInnerActive]} />
           </TouchableOpacity>
@@ -268,7 +410,9 @@ export default function CameraScreen() {
             <Text style={styles.galleryText}>Virar</Text>
           </TouchableOpacity>
         </View>
-        {recording && <Text style={styles.recText}>Gravando…</Text>}
+        <Text style={styles.dica}>
+          {recording ? 'Toque no botão pra parar' : 'Toque pra foto · segure 2s pra gravar'}
+        </Text>
         {publicando && <Text style={styles.recText}>Publicando…</Text>}
       </View>
     </View>
@@ -285,6 +429,7 @@ const styles = StyleSheet.create({
   iconBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,.3)', alignItems: 'center', justifyContent: 'center' },
   storieBadge: { backgroundColor: 'rgba(0,0,0,.35)', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 7 },
   storieBadgeText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  // bottom maior: a pill some, mas mantém folga do gesto de sistema
   controls: { position: 'absolute', bottom: 40, left: 0, right: 0, alignItems: 'center', gap: 10 },
   controlsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 28 },
   galleryBtn: { width: 52, alignItems: 'center', gap: 3 },
@@ -294,13 +439,7 @@ const styles = StyleSheet.create({
   recInner: { width: 58, height: 58, borderRadius: 29, backgroundColor: '#fff' },
   recInnerActive: { width: 30, height: 30, borderRadius: 6, backgroundColor: '#ef4444' },
   recText: { color: '#ef4444', fontSize: 13, fontWeight: '700' },
-  previewHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 14, backgroundColor: 'rgba(2,8,23,.9)' },
-  previewTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  previewBody: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20, gap: 16 },
-  previewIcon: { fontSize: 64 },
-  previewText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  publishBtn: { backgroundColor: COLORS.primary, paddingVertical: 16, paddingHorizontal: 32, borderRadius: 14, marginTop: 12 },
-  publishBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  dica: { color: 'rgba(255,255,255,0.75)', fontSize: 11.5, fontWeight: '600' },
   discard: { color: COLORS.textSecondary, fontSize: 13, marginTop: 8 },
   // preview estilo Instagram
   previewFooter: {

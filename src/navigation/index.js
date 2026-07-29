@@ -41,6 +41,7 @@ import SettingsScreen from '../screens/SettingsScreen';
 import VideoScreen from '../screens/VideoScreen';
 import StoryViewerScreen from '../screens/StoryViewerScreen';
 import CriarGrupoScreen from '../screens/CriarGrupoScreen';
+import FollowListScreen from '../screens/FollowListScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -129,6 +130,13 @@ function MainTabs() {
     // cada 45s + ao voltar pro app; some ao zerar. Guest = sem poll.
     const token = useAuthStore((s) => s.token);
     const [chatUnread, setChatUnread] = useState(0);
+    // Tela de captura (CameraScreen) pede pra sumir com a pill flutuante
+    // enquanto grava/revisa — senao ela fica por cima dos controles.
+    const [esconderTabBar, setEsconderTabBar] = useState(false);
+    useEffect(() => {
+      const sub = DeviceEventEmitter.addListener('bt-tabbar-hide', (v) => setEsconderTabBar(!!v));
+      return () => sub.remove();
+    }, []);
     useEffect(() => {
       if (!token) { setChatUnread(0); return; }
       let alive = true;
@@ -148,7 +156,10 @@ function MainTabs() {
                   headerShown: false,
                   // Pill flutuante estilo Instagram: menor, icones centralizados
                   // verticalmente, fundo mais claro com mais blur (liquid glass).
-                  tabBarStyle: {
+                  // A pill fica ACIMA de tudo (position absolute) e cobria os
+                  // botoes da camera/preview do storie — por isso a tela de
+                  // captura pede pra escondê-la via evento 'bt-tabbar'.
+                  tabBarStyle: esconderTabBar ? { display: 'none' } : {
                               position: 'absolute',
                               bottom: Math.max(insets.bottom, 10) + 8,
                               left: 34,
@@ -271,6 +282,7 @@ export default function Navigation() {
                        <Stack.Screen name="Video" component={VideoScreen} />
                        <Stack.Screen name="StoryViewer" component={StoryViewerScreen} />
                        <Stack.Screen name="CriarGrupo" component={CriarGrupoScreen} />
+                       <Stack.Screen name="FollowList" component={FollowListScreen} />
 </Stack.Navigator>
   </NavigationContainer>
   );

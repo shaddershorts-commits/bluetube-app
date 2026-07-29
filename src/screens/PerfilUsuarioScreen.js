@@ -113,7 +113,7 @@ export default function PerfilUsuarioScreen({ route }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: COLORS.background }}>
-      <Header title={`@${profile.username || ''}`} showBack right={<TouchableOpacity onPress={() => openModeration(nav, { tipoAlvo: 'usuario', alvoId: profile.user_id, userId: profile.user_id, username: profile.username, onBlocked: () => nav.goBack() })} hitSlop={10}><Ionicons name="ellipsis-vertical" size={20} color="#8aa0bd" /></TouchableOpacity>} />
+      <Header title={`@${profile.username || ''}`} showBack right={<TouchableOpacity onPress={() => openModeration(nav, { tipoAlvo: 'usuario', alvoId: profile.user_id, userId: profile.user_id, username: profile.username, onBlocked: () => nav.goBack() })} hitSlop={10}><Ionicons name="ellipsis-vertical" size={20} color={COLORS.textSecondary} /></TouchableOpacity>} />
       <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
         <View style={styles.hero}>
           <Avatar uri={profile.avatar_url} initial={profile.display_name || profile.username} size={92} />
@@ -122,8 +122,20 @@ export default function PerfilUsuarioScreen({ route }) {
 
           <View style={styles.statsRow}>
             <Stat value={videos.length} label="Vídeos" />
-            <Stat value={profile.seguindo || 0} label="Seguindo" />
-            <Stat value={followerCount} label="Seguidores" />
+            <Stat
+              value={profile.seguindo || 0}
+              label="Seguindo"
+              onPress={() => nav.navigate('FollowList', {
+                user_id: profile.user_id, username: profile.username, tab: 'seguindo',
+              })}
+            />
+            <Stat
+              value={followerCount}
+              label="Seguidores"
+              onPress={() => nav.navigate('FollowList', {
+                user_id: profile.user_id, username: profile.username, tab: 'seguidores',
+              })}
+            />
           </View>
 
           {profile.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
@@ -201,12 +213,13 @@ export default function PerfilUsuarioScreen({ route }) {
   );
 }
 
-function Stat({ value, label }) {
+function Stat({ value, label, onPress }) {
+  const Wrap = onPress ? TouchableOpacity : View;
   return (
-    <View style={styles.stat}>
+    <Wrap style={styles.stat} onPress={onPress} activeOpacity={0.6}>
       <Text style={styles.statValue}>{formatCount(value)}</Text>
       <Text style={styles.statLabel}>{label}</Text>
-    </View>
+    </Wrap>
   );
 }
 
@@ -230,16 +243,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   msgBtn: {
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: COLORS.chipBg,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: COLORS.border,
     width: 44, height: 44, borderRadius: 10,
     alignItems: 'center', justifyContent: 'center',
   },
   followingBtn: {
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: COLORS.chipBg,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: COLORS.border,
   },
   busyBtn: { opacity: 0.7 },
   followText: { color: '#fff', fontWeight: '700', fontSize: 14 },

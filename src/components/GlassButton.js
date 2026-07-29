@@ -61,7 +61,7 @@ export default function GlassButton({
         )}
         {variant === 'glass' && (
           <>
-            <BlurView intensity={blurT.medium} tint="dark" style={StyleSheet.absoluteFill} />
+            <BlurView intensity={blurT.medium} tint={colors.glassTint} style={StyleSheet.absoluteFill} />
             <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.glassDark }]} pointerEvents="none" />
           </>
         )}

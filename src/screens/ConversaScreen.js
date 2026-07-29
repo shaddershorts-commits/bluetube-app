@@ -23,6 +23,7 @@ import GlassMenu from '../components/GlassMenu';
 import ShareCard from '../components/ShareCard';
 import { COLORS } from '../constants';
 import { useChatTheme } from '../store/theme';
+import { wallpaperKey, getWallpaper, setWallpaper, removeWallpaper } from '../utils/wallpaper';
 
 function fmtDur(s) {
   if (!s || !isFinite(s)) return '0:00';
@@ -76,7 +77,7 @@ function AudioBubble({ msg, mine }) {
   return (
     <TouchableOpacity style={styles.audioRow} onPress={toggle}>
       <Ionicons name={playing ? 'pause-circle' : 'play-circle'} size={34} color={mine ? '#fff' : COLORS.neon} />
-      <View style={styles.audioBar}>
+      <View style={[styles.audioBar, !mine && { backgroundColor: COLORS.border }]}>
         <View style={[styles.audioFill, { width: msg.media_duration ? Math.min(100, (pos / msg.media_duration) * 100) + '%' : '0%', backgroundColor: mine ? '#fff' : COLORS.neon }]} />
       </View>
       <Text style={[styles.audioDur, mine && { color: 'rgba(255,255,255,0.8)' }]}>
@@ -117,6 +118,9 @@ export default function ConversaScreen({ route }) {
   const [presence, setPresence] = useState(null);
   const [membrosCount, setMembrosCount] = useState(null);
   const [msgMenu, setMsgMenu] = useState(null);       // mensagem alvo do long-press
+  const [headerMenu, setHeaderMenu] = useState(false); // menu ⋮ do header
+  const [wallMenu, setWallMenu] = useState(false);     // submenu papel de parede
+  const [wallpaper, setWallpaperUri] = useState(null); // fundo da conversa (local)
   const [editing, setEditing] = useState(null);       // mensagem em edição
   const [requestPend, setRequestPend] = useState(!!is_request); // banner Novos contatos
   const [meuRole, setMeuRole] = useState('membro');   // meu papel no grupo
@@ -243,6 +247,39 @@ export default function ConversaScreen({ route }) {
     return opts;
   };
 
+  // ── Papel de parede da conversa (por conversa, por aparelho) ────────────
+  const wallKey = wallpaperKey({ grupoId: isGrupo ? grupo?.id : null, convId });
+  useEffect(() => {
+    let cancelled = false;
+    if (!wallKey) return;
+    getWallpaper(wallKey)
+      .then((uri) => { if (!cancelled) setWallpaperUri(uri); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [wallKey]);
+
+  const escolherPapelParede = async () => {
+    try {
+      // Photo Picker do sistema — sem pedir permissão de galeria
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.9,
+      });
+      if (res.canceled || !res.assets?.length) return;
+      const uri = await setWallpaper(wallKey, res.assets[0].uri);
+      setWallpaperUri(uri);
+    } catch (e) {
+      Alert.alert('Erro', e.message || 'Não deu pra definir o papel de parede.');
+    }
+  };
+
+  const tirarPapelParede = async () => {
+    try {
+      await removeWallpaper(wallKey);
+      setWallpaperUri(null);
+    } catch (e) {}
+  };
+
   // Aceitar "novo contato" → conversa vai pra lista principal
   const aceitarContato = async () => {
     if (!other?.user_id) return;
@@ -360,7 +397,12 @@ export default function ConversaScreen({ route }) {
         ) : null}
         {body ? <Text style={[styles.msg, mine ? ov.msgMine : ov.msgOther]}>{body}</Text> : null}
         <View style={styles.tickRow}>
-          {item.edited_at ? <Text style={styles.editada}>editada</Text> : null}
+          {/* "editada" acompanha a bolha: branco translúcido só serve na bolha
+              azul (minha). Na bolha do outro, que é BRANCA no tema claro,
+              precisa de texto escuro senão some. */}
+          {item.edited_at ? (
+            <Text style={[styles.editada, !mine && { color: COLORS.textSecondary }]}>editada</Text>
+          ) : null}
           {mine && !isGrupo ? <Ticks msg={item} /> : null}
         </View>
       </View>
@@ -370,6 +412,16 @@ export default function ConversaScreen({ route }) {
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[styles.container, ov.container]}>
+      {/* Papel de parede: desfoque LEVE (blurRadius do próprio <Image>, que é
+          nativo nos dois sistemas) + véu escuro sutil, só o suficiente pras
+          bolhas continuarem legíveis por cima de qualquer foto. */}
+      {wallpaper ? (
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          <Image source={{ uri: wallpaper }} style={StyleSheet.absoluteFill} resizeMode="cover" blurRadius={6} />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.28)' }]} />
+        </View>
+      ) : null}
+
       {/* Header estilo WhatsApp: avatar + nome + presença */}
       <View style={[styles.header, ov.header, { paddingTop: insets.top + 6 }]}>
         <TouchableOpacity onPress={() => nav.goBack()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
@@ -386,13 +438,11 @@ export default function ConversaScreen({ route }) {
           <Text style={styles.headerName} numberOfLines={1}>{headerTitle}</Text>
           <Text style={[styles.headerSub, headerSub === 'online' && { color: '#4ade80' }]} numberOfLines={1}>{headerSub}</Text>
         </TouchableOpacity>
-        {!isGrupo && other?.user_id ? (
-          <TouchableOpacity
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            onPress={() => openModeration(nav, { tipoAlvo: 'usuario', alvoId: other.user_id, userId: other.user_id, username: other.username, onBlocked: () => nav.goBack() })}>
-            <Ionicons name="ellipsis-vertical" size={20} color={COLORS.textSecondary} />
-          </TouchableOpacity>
-        ) : null}
+        <TouchableOpacity
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          onPress={() => setHeaderMenu(true)}>
+          <Ionicons name="ellipsis-vertical" size={20} color={COLORS.textSecondary} />
+        </TouchableOpacity>
       </View>
 
       <FlatList
@@ -481,6 +531,37 @@ export default function ConversaScreen({ route }) {
         title="Mensagem"
         options={msgMenuOptions()}
         onClose={() => setMsgMenu(null)}
+      />
+
+      {/* Menu ⋮ do header */}
+      <GlassMenu
+        visible={headerMenu}
+        title={headerTitle}
+        options={[
+          { icon: 'image-outline', label: 'Papel de parede', onPress: () => setWallMenu(true) },
+          isGrupo
+            ? { icon: 'information-circle-outline', label: 'Dados do grupo', onPress: () => nav.navigate('GrupoInfo', { grupo }) }
+            : (other?.user_id ? { icon: 'person-outline', label: 'Ver perfil', onPress: () => nav.navigate('PerfilUsuario', { user_id: other.user_id }) } : null),
+          !isGrupo && other?.user_id
+            ? {
+                icon: 'flag-outline', label: 'Denunciar ou bloquear', danger: true,
+                onPress: () => openModeration(nav, { tipoAlvo: 'usuario', alvoId: other.user_id, userId: other.user_id, username: other.username, onBlocked: () => nav.goBack() }),
+              }
+            : null,
+        ]}
+        onClose={() => setHeaderMenu(false)}
+      />
+
+      {/* Submenu do papel de parede */}
+      <GlassMenu
+        visible={wallMenu}
+        title="Papel de parede da conversa"
+        subtitle="Vale só pra você, neste aparelho"
+        options={[
+          { icon: 'images-outline', label: 'Escolher da galeria', onPress: escolherPapelParede },
+          wallpaper ? { icon: 'trash-outline', label: 'Remover papel de parede', danger: true, onPress: tirarPapelParede } : null,
+        ]}
+        onClose={() => setWallMenu(false)}
       />
     </KeyboardAvoidingView>
   );

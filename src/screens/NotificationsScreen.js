@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
   msg: { color: COLORS.textSecondary, fontSize: 12, marginTop: 2 },
   time: { color: COLORS.textDim, fontSize: 11, marginTop: 4 },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.neon },
-  sep: { height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(255,255,255,0.06)', marginLeft: 68 },
+  sep: { height: StyleSheet.hairlineWidth, backgroundColor: COLORS.hairline, marginLeft: 68 },
   empty: { alignItems: 'center', paddingVertical: 100, gap: 8, paddingHorizontal: 32 },
   emptyIcon: { fontSize: 48 },
   emptyText: { color: COLORS.text, fontSize: 16, fontWeight: '700' },

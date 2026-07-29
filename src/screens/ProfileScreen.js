@@ -217,8 +217,20 @@ export default function ProfileScreen() {
 
           <View style={styles.statsRow}>
             <Stat value={videos.length} label="Vídeos" />
-            <Stat value={profile?.seguindo || 0} label="Seguindo" />
-            <Stat value={profile?.seguidores || 0} label="Seguidores" />
+            <Stat
+              value={profile?.seguindo || 0}
+              label="Seguindo"
+              onPress={() => profile?.user_id && nav.navigate('FollowList', {
+                user_id: profile.user_id, username: profile.username, tab: 'seguindo', isMe: true,
+              })}
+            />
+            <Stat
+              value={profile?.seguidores || 0}
+              label="Seguidores"
+              onPress={() => profile?.user_id && nav.navigate('FollowList', {
+                user_id: profile.user_id, username: profile.username, tab: 'seguidores', isMe: true,
+              })}
+            />
             {profile?.account_type !== 'pessoal' && <Stat value={totalLikes} label="Curtidas" />}
           </View>
 
@@ -267,9 +279,9 @@ export default function ProfileScreen() {
       {/* Menu hamburger (bottom sheet) — Liquid Glass */}
       <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
         <Pressable style={styles.menuBackdrop} onPress={() => setMenuOpen(false)}>
-          <BlurView intensity={blurT.heavy} tint="dark" style={StyleSheet.absoluteFill} />
+          <BlurView intensity={blurT.heavy} tint={COLORS.glassTint} style={StyleSheet.absoluteFill} />
           <Pressable style={[styles.menuSheet, { paddingBottom: insets.bottom + 12 }]}>
-            <BlurView intensity={blurT.medium} tint="dark" style={StyleSheet.absoluteFill} />
+            <BlurView intensity={blurT.medium} tint={COLORS.glassTint} style={StyleSheet.absoluteFill} />
             <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.glassDark }]} pointerEvents="none" />
             <View style={styles.menuHandle} />
             <MenuItem icon="person-outline" label="Editar perfil" onPress={() => { setMenuOpen(false); nav.navigate('EditProfile'); }} />
@@ -301,12 +313,13 @@ export default function ProfileScreen() {
   );
 }
 
-function Stat({ value, label }) {
+function Stat({ value, label, onPress }) {
+  const Wrap = onPress ? TouchableOpacity : View;
   return (
-    <View style={styles.stat}>
+    <Wrap style={styles.stat} onPress={onPress} activeOpacity={0.6}>
       <Text style={styles.statValue}>{formatCount(value)}</Text>
       <Text style={styles.statLabel}>{label}</Text>
-    </View>
+    </Wrap>
   );
 }
 
@@ -332,16 +345,16 @@ const GridCard = require('react').memo(function GridCard({ video, width, height,
 function MenuItem({ icon, label, onPress, color }) {
   return (
     <TouchableOpacity style={styles.menuItem} onPress={onPress} activeOpacity={0.7}>
-      <Ionicons name={icon} size={22} color={color || COLORS.text} />
+      <Ionicons name={icon} size={22} color={color || COLORS.onGlass} />
       <Text style={[styles.menuLabel, color && { color }]}>{label}</Text>
-      <Ionicons name="chevron-forward" size={16} color={COLORS.textDim} />
+      <Ionicons name="chevron-forward" size={16} color={COLORS.onGlassDim} />
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   appVersion: {
-    textAlign: 'center', color: 'rgba(140,165,195,0.45)', fontSize: 11,
+    textAlign: 'center', color: COLORS.textDim, fontSize: 11,
     paddingVertical: 18, letterSpacing: 0.5,
   },
   storyPlus: {
@@ -361,7 +374,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
+    borderBottomColor: COLORS.hairline,
   },
   topTitle: { color: COLORS.text, fontSize: 17, fontWeight: '700', flex: 1, textAlign: 'center' },
   hamburger: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
@@ -377,13 +390,13 @@ const styles = StyleSheet.create({
   statLabel: { color: COLORS.textSecondary, fontSize: 11, marginTop: 2 },
 
   actionRow: { flexDirection: 'row', gap: 8, marginTop: 18, width: '100%' },
-  actionBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
-  actionBtnPrimary: { backgroundColor: 'rgba(255,255,255,0.03)' },
+  actionBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.border },
+  actionBtnPrimary: { backgroundColor: COLORS.chipBg },
   actionBtnText: { color: COLORS.text, fontSize: 14, fontWeight: '700' },
   actionBtnSquare: {
     width: 40, height: 40, borderRadius: 10,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1, borderColor: COLORS.border,
   },
 
   sortRow: {
@@ -393,13 +406,13 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: COLORS.hairline,
   },
-  sortLabel: { color: 'rgba(232,244,255,0.4)', fontSize: 10, fontWeight: '700', letterSpacing: 0.6, flex: 1 },
+  sortLabel: { color: COLORS.textSecondary, fontSize: 10, fontWeight: '700', letterSpacing: 0.6, flex: 1 },
   sortBtns: { flexDirection: 'row', gap: 6 },
   sortBtn: {
     paddingHorizontal: 12, paddingVertical: 6,
-    borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 14, borderWidth: 1, borderColor: COLORS.border,
   },
   sortBtnActive: { backgroundColor: COLORS.neon, borderColor: COLORS.neon },
   sortBtnText: { color: COLORS.textSecondary, fontSize: 12, fontWeight: '600' },
@@ -430,7 +443,7 @@ const styles = StyleSheet.create({
   emptyHint: { color: COLORS.textDim, fontSize: 12, marginTop: 6 },
 
   menuBackdrop: {
-    flex: 1, backgroundColor: 'rgba(2,8,23,0.45)', // semi-transparente, BlurView faz o resto
+    flex: 1, backgroundColor: COLORS.overlay, // semi-transparente, BlurView faz o resto
     justifyContent: 'flex-end',
   },
   menuSheet: {
@@ -443,21 +456,21 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderLeftWidth: 1,
     borderRightWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: COLORS.glassBorder,
   },
   menuHandle: {
     width: 42, height: 4, borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: COLORS.onGlassDim,
     alignSelf: 'center', marginBottom: 12,
   },
   menuItem: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
     paddingVertical: 14, paddingHorizontal: 6,
   },
-  menuLabel: { flex: 1, color: COLORS.text, fontSize: 15, fontWeight: '500' },
+  menuLabel: { flex: 1, color: COLORS.onGlass, fontSize: 15, fontWeight: '500' },
   menuDivider: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: COLORS.hairline,
     marginVertical: 6,
   },
 });
