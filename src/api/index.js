@@ -316,10 +316,18 @@ export const blueAPI = {
           const token = await getToken();
           return api(`blue-follow?action=lista-seguindo&user_id=${encodeURIComponent(user_id)}&pagina=${pagina}&token=${encodeURIComponent(token || '')}`);
     },
-    // TODO: blue-profile.js precisa ter action=sugestoes-seguir
+    // Sugestões de quem seguir (passo "Quem seguir?" do cadastro).
+    // FIX 2026-07-29: apontava pra `blue-profile?action=sugestoes-seguir`, que
+    // NUNCA existiu (havia até um TODO admitindo isso) — a tela caía sempre em
+    // "Nenhuma sugestao no momento" e quem se cadastrava PELO APP não seguia
+    // ninguém, nascendo com o feed vazio. A action mora em blue-onboarding
+    // (POST + token), que é o que o site já usa. Retorna { sugestoes: [...] }.
     sugestoesSeguir: async () => {
           const token = await getToken();
-          return api(`blue-profile?action=sugestoes-seguir&token=${encodeURIComponent(token)}`);
+          return api('blue-onboarding', {
+                method: 'POST',
+                body: JSON.stringify({ action: 'sugestoes-seguir', token }),
+          });
     },
 
     // Comentarios

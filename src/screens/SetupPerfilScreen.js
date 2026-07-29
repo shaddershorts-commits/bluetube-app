@@ -241,8 +241,8 @@ export default function SetupPerfilScreen({ navigation }) {
                         <View key={u.id||u.user_id} style={S.sugRow}>
               <View style={S.sugAv}>{u.avatar_url ? <Image source={{uri:u.avatar_url}} style={{width:'100%',height:'100%'}} /> : <Ionicons name="person" size={18} color={COLORS.textDim} />}</View>
               <View style={{flex:1}}>
-                <Text style={{color:COLORS.text,fontWeight:'700',fontSize:14}}>{u.nome||u.name||u.username}</Text>
-                <Text style={{color:COLORS.textSecondary,fontSize:12}}>@{u.username}</Text>
+                <Text style={{color:COLORS.text,fontWeight:'700',fontSize:14}}>{u.display_name||u.nome||u.name||u.username}</Text>
+                <Text style={{color:COLORS.textSecondary,fontSize:12}}>@{u.username}{u.seguidores?` · ${u.seguidores} seguidores`:''}</Text>
             </View>
               <TouchableOpacity onPress={()=>toggleSeguir(u.id||u.user_id)} style={[S.followBtn,seguindo.has(u.id||u.user_id)&&S.followOn]}>
                             <Text style={[S.followTxt,seguindo.has(u.id||u.user_id)&&{color:'#fff'}]}>{seguindo.has(u.id||u.user_id)?'Seguindo':'Seguir'}</Text>
