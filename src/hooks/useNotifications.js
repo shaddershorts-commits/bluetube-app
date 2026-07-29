@@ -14,9 +14,21 @@ Notifications.setNotificationHandler({
   }),
 });
 
-export function useNotifications() {
+// FIX 2026-07-29 (push nunca chegava): este hook é quem registra o aparelho no
+// Expo e manda o token pro backend — e ele NÃO ERA CHAMADO EM LUGAR NENHUM.
+// Só o toggle de Configurações importava register/unregister. Resultado: a
+// tabela `user_push_tokens` estava VAZIA no app inteiro, então
+// `sendPushToUser` sempre saía com `sent: 0` e nenhuma notificação nativa foi
+// entregue desde o lançamento. Agora o App.js monta o hook.
+//
+// Recebe o token do usuário: só registra DEPOIS do login (visitante não leva
+// pedido de permissão na cara) e re-registra quando alguém entra na conta.
+export function useNotifications(userToken) {
   useEffect(() => {
-    register();
+    if (userToken) register();
+  }, [userToken]);
+
+  useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
       const url = response.notification.request.content.data?.url;
       if (url) Linking.openURL(url);
@@ -62,6 +74,12 @@ async function register(force = false) {
       const off = await SecureStore.getItemAsync('bt_push_off').catch(() => null);
       if (off === '1') return;
     }
+    // Sem login não há pra quem associar o token — checa ANTES de pedir
+    // permissão, senão o visitante levava o pop-up do sistema à toa e o
+    // registro morria logo depois por falta de token.
+    const jaLogado = await SecureStore.getItemAsync('bt_token');
+    if (!jaLogado) return false;
+
     const { status } = await Notifications.requestPermissionsAsync();
     if (status !== 'granted') return false;
     if (Platform.OS === 'android') {

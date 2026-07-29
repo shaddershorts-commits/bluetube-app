@@ -10,6 +10,7 @@ import { COLORS, applyMode } from './src/constants';
 import { useAuthStore, useFeedStore } from './src/store';
 import { useLangStore } from './src/i18n';
 import ErrorBoundary from './src/components/ErrorBoundary';
+import { useNotifications } from './src/hooks/useNotifications';
 import { initSentry, setUserContext, wrap } from './src/utils/sentry';
 
 // Sentry precisa inicializar antes de qualquer render
@@ -18,6 +19,10 @@ initSentry();
 function App() {
   const init = useAuthStore((s) => s.init);
   const user = useAuthStore((s) => s.user);
+  const token = useAuthStore((s) => s.token);
+  // Registra o aparelho pra push assim que houver login. Sem esta chamada a
+  // tabela user_push_tokens ficava vazia e NENHUM push era entregue.
+  useNotifications(token);
   // Tema claro/escuro GLOBAL: aplica a paleta salva ANTES de importar as telas
   // (require tardio), pra todo StyleSheet.create nascer com as cores certas.
   const [Nav, setNav] = useState(null);

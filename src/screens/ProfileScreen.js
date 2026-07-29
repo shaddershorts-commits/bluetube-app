@@ -112,11 +112,17 @@ export default function ProfileScreen() {
   const sortedVideos = useMemo(() => sortVideos(videos, sortMode), [videos, sortMode]);
 
   // Criar story de 24h: escolhe foto ou video da galeria, sobe e registra.
+  //
+  // FIX 2026-07-29 (o "+" na foto do perfil não fazia nada): havia um
+  // requestMediaLibraryPermissionsAsync aqui, mas READ_MEDIA_IMAGES/VIDEO
+  // estão em `blockedPermissions` no app.config.js desde a adequação à
+  // política Photo & Video do Google. Ou seja, a permissão era negada SEMPRE
+  // → caía no alerta "Libera o acesso à galeria" e voltava sem abrir nada.
+  // O Photo Picker do sistema (launchImageLibraryAsync) NÃO precisa de
+  // permissão — é o mesmo caminho que a câmera e o chat já usam.
   const criarStory = async () => {
     try {
       const ImagePicker = require('expo-image-picker');
-      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!perm.granted) { Alert.alert('Permissão', 'Libera o acesso à galeria pra postar um story.'); return; }
       const res = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.All,
         quality: 0.85,
