@@ -14,9 +14,14 @@ if (!isExpoGo) {
   }
 }
 
-// DSN vem via app.config.js → Constants.expoConfig.extra.sentryDsn
-// (process.env não existe em runtime no Expo — tem que passar pelo extra).
-const DSN = Constants.expoConfig?.extra?.sentryDsn || '';
+// DSN com fallback EMBUTIDO (fix 2026-07-30): vinha só do .env via extra —
+// e .env é gitignored, NUNCA entrou em build nenhum → DSN vazio → initSentry
+// retornava cedo → ZERO telemetria de crash desde o lançamento. Mesmo padrão
+// que já quebrou a anon key (v1.5.4). DSN não é segredo: vai dentro de
+// qualquer bundle que usa Sentry; só serve pra ENVIAR eventos.
+// Org bluetube-viral · projeto react-native.
+const DSN = Constants.expoConfig?.extra?.sentryDsn ||
+  'https://d9ff2ec70c5cff196f000fecc3f7e5d7@o4511232883687424.ingest.us.sentry.io/4511232895746048';
 const RELEASE = Constants.expoConfig?.version || '1.0.0';
 
 let _initialized = false;
