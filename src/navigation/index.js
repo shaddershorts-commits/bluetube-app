@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Linking as RNLinking, Image, View, StyleSheet, DeviceEventEmitter } from 'react-native';
 import * as Linking from 'expo-linking';
 import { BlurView } from 'expo-blur';
-import { NavigationContainer, DarkTheme } from '@react-navigation/native';
+import { NavigationContainer, DarkTheme, createNavigationContainerRef } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -42,9 +42,15 @@ import VideoScreen from '../screens/VideoScreen';
 import StoryViewerScreen from '../screens/StoryViewerScreen';
 import CriarGrupoScreen from '../screens/CriarGrupoScreen';
 import FollowListScreen from '../screens/FollowListScreen';
+import CallScreen from '../screens/CallScreen';
+import { supabase } from '../lib/supabase';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
+
+// Ref global de navegação: deixa código FORA da árvore de telas navegar
+// (ex.: toque num push de chamada, tratado no useNotifications do App.js).
+export const navigationRef = createNavigationContainerRef();
 
 const NAV_THEME = {
     ...DarkTheme,
@@ -218,10 +224,38 @@ function MainTabs() {
   );
 }
 
+// ── CHAMADA RECEBIDA com o app ABERTO ───────────────────────────────────────
+// Assina o canal Realtime `ring-<meuId>` enquanto houver login. Quem liga
+// dispara um broadcast 'ring' nesse canal logo após criar a chamada; aqui a
+// gente navega pra CallScreen no modo incoming (que toca o ringtone e valida
+// na API se a chamada ainda está de pé). App FECHADO é coberto pelo push FCM
+// (useNotifications roteia o toque na notificação pra cá também).
+function useIncomingCallRing(navigation) {
+  const userId = useAuthStore((s) => s.user?.id);
+  useEffect(() => {
+    if (!userId) return;
+    const ch = supabase.channel(`ring-${userId}`);
+    ch.on('broadcast', { event: 'ring' }, ({ payload }) => {
+      if (!payload?.call_id) return;
+      try {
+        navigation.navigate('Call', {
+          mode: 'incoming',
+          callId: payload.call_id,
+          tipo: payload.tipo === 'video' ? 'video' : 'audio',
+          other: payload.caller || null,
+        });
+      } catch (e) {}
+    });
+    ch.subscribe();
+    return () => { try { supabase.removeChannel(ch); } catch (e) {} };
+  }, [userId, navigation]);
+}
+
 // Verifica onboarding e redireciona se necessario.
 // GUEST-FIRST: so checa onboarding se houver token (guest cai direto no feed).
 function MainWithOnboarding({ navigation }) {
     const token = useAuthStore((s) => s.token);
+    useIncomingCallRing(navigation);
     useEffect(() => {
           if (!token) return; // guest: sem onboarding, vai direto pro feed
           let cancelled = false;
@@ -255,7 +289,7 @@ export default function Navigation() {
   // sao MODAIS acionados quando o guest tenta interagir (via requireAuth).
   // Todas as telas ficam sempre montadas; o gate de login vive nas acoes.
   return (
-        <NavigationContainer theme={NAV_THEME} linking={linking}>
+        <NavigationContainer ref={navigationRef} theme={NAV_THEME} linking={linking}>
           <Stack.Navigator initialRouteName="Main" screenOptions={{ headerShown: false }}>
                        <Stack.Screen name="Main" component={MainWithOnboarding} />
                        <Stack.Group screenOptions={{ presentation: 'modal' }}>
@@ -283,6 +317,7 @@ export default function Navigation() {
                        <Stack.Screen name="StoryViewer" component={StoryViewerScreen} />
                        <Stack.Screen name="CriarGrupo" component={CriarGrupoScreen} />
                        <Stack.Screen name="FollowList" component={FollowListScreen} />
+                       <Stack.Screen name="Call" component={CallScreen} options={{ gestureEnabled: false }} />
 </Stack.Navigator>
   </NavigationContainer>
   );

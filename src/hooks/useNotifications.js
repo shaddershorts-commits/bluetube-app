@@ -30,7 +30,36 @@ export function useNotifications(userToken) {
 
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-      const url = response.notification.request.content.data?.url;
+      const data = response.notification.request.content.data || {};
+      // Push de CHAMADA: toca direto pra tela de atender (o CallScreen valida
+      // na API se ainda está tocando — chegar atrasado mostra "perdida").
+      if (data.tipo === 'call' && data.call_id) {
+        const navegar = () => {
+          try {
+            const { navigationRef } = require('../navigation');
+            if (navigationRef.isReady()) {
+              navigationRef.navigate('Call', {
+                mode: 'incoming',
+                callId: data.call_id,
+                tipo: data.call_tipo === 'video' ? 'video' : 'audio',
+                other: data.from_user_id ? { user_id: data.from_user_id } : null,
+              });
+              return true;
+            }
+          } catch (e) {}
+          return false;
+        };
+        // app abrindo frio: o navigator pode não estar pronto ainda — re-tenta
+        if (!navegar()) {
+          let tentativas = 0;
+          const iv = setInterval(() => {
+            tentativas += 1;
+            if (navegar() || tentativas > 20) clearInterval(iv);
+          }, 500);
+        }
+        return;
+      }
+      const url = data.url;
       if (url) Linking.openURL(url);
     });
     return () => sub.remove();

@@ -553,6 +553,36 @@ export const blueAPI = {
           return api(`blue-chat?action=contatos-list&token=${encodeURIComponent(token)}`);
     },
 
+    // ── CHAMADAS de voz/vídeo (blue-calls) ────────────────────────────────
+    callIniciar: async (to_user_id, tipo) => {
+          const token = await getToken();
+          return api('blue-calls', { method: 'POST', body: JSON.stringify({ action: 'iniciar', token, to_user_id, tipo }) });
+    },
+    callAtender: async (call_id) => {
+          const token = await getToken();
+          return api('blue-calls', { method: 'POST', body: JSON.stringify({ action: 'atender', token, call_id }) });
+    },
+    callRecusar: async (call_id) => {
+          const token = await getToken();
+          return api('blue-calls', { method: 'POST', body: JSON.stringify({ action: 'recusar', token, call_id }) });
+    },
+    callCancelar: async (call_id) => {
+          const token = await getToken();
+          return api('blue-calls', { method: 'POST', body: JSON.stringify({ action: 'cancelar', token, call_id }) });
+    },
+    callEncerrar: async (call_id) => {
+          const token = await getToken();
+          return api('blue-calls', { method: 'POST', body: JSON.stringify({ action: 'encerrar', token, call_id }) });
+    },
+    callEstado: async (call_id) => {
+          const token = await getToken();
+          return api('blue-calls', { method: 'POST', body: JSON.stringify({ action: 'estado', token, call_id }) });
+    },
+    callsHistorico: async () => {
+          const token = await getToken();
+          return api(`blue-calls?action=historico&token=${encodeURIComponent(token || '')}`);
+    },
+
     // Onboarding
     onboardingStatus: async () => {
           const token = await getToken();

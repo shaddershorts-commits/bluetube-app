@@ -105,6 +105,10 @@ export default {
                   ['expo-build-properties', {
                             android: { compileSdkVersion: 35, targetSdkVersion: 35 },
                   }],
+                  // Chamadas de voz/vídeo (v1.5.2 / AAB 153): react-native-webrtc.
+                  // O plugin ajusta o gradle/manifest pro WebRTC; câmera e microfone
+                  // JÁ estavam nas permissions (nenhuma permissão nova pra revisão).
+                  '@config-plugins/react-native-webrtc',
                   'expo-camera',
                   // expo-media-library REMOVIDO (política Photo & Video Permissions):
                   // adicionava READ_MEDIA_IMAGES/VIDEO ao manifest. Seleção de mídia

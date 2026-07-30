@@ -286,7 +286,7 @@ export default function ChatScreen() {
           }
         />
       ) : (
-        <ChamadasTeaser T={T} />
+        <ChamadasHistorico T={T} nav={nav} />
       )}
 
       {/* FAB: conversas = adicionar usuário · status = postar */}
@@ -389,75 +389,70 @@ const mkStyles = (T) => StyleSheet.create({
   menuDivider: { height: 1, backgroundColor: T.border },
 });
 
-// ── Teaser animado da aba Chamadas (user 2026-07-24): mostra o que a aba
-// vai virar — anéis pulsando estilo "ligação chegando" + recursos previstos.
-// Recebe T (paleta do modo) — os textos eram '#e8f4ff' / rgba(200,225,255,…)
-// fixos, ou seja, brancos sobre o fundo branco do tema claro = sumiam.
-function ChamadasTeaser({ T }) {
-  const ring1 = useRef(new Animated.Value(0)).current;
-  const ring2 = useRef(new Animated.Value(0)).current;
-  const shake = useRef(new Animated.Value(0)).current;
-  const fade = useRef(new Animated.Value(0)).current;
+// ── Aba Chamadas (v1.5.2): o teaser virou HISTÓRICO REAL ────────────────────
+// Lista as chamadas (voz/vídeo, feitas/recebidas/perdidas) e toca de novo com
+// um toque. Perdida = vermelho, estilo WhatsApp.
+function fmtDurCall(s) {
+  if (!s) return '';
+  const m = Math.floor(s / 60), r = s % 60;
+  return m > 0 ? `${m}min ${r}s` : `${r}s`;
+}
 
-  useEffect(() => {
-    const pulse = (v, delay) => Animated.loop(
-      Animated.sequence([
-        Animated.delay(delay),
-        Animated.timing(v, { toValue: 1, duration: 1800, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-        Animated.timing(v, { toValue: 0, duration: 0, useNativeDriver: true }),
-      ])
-    );
-    const ring = pulse(ring1, 0); ring.start();
-    const ring2Anim = pulse(ring2, 900); ring2Anim.start();
-    // telefone "tocando": balança a cada 3s
-    const shakeAnim = Animated.loop(
-      Animated.sequence([
-        Animated.delay(2200),
-        ...[8, -8, 6, -6, 3, 0].map((deg) =>
-          Animated.timing(shake, { toValue: deg, duration: 80, useNativeDriver: true })
-        ),
-      ])
-    );
-    shakeAnim.start();
-    Animated.timing(fade, { toValue: 1, duration: 700, useNativeDriver: true }).start();
-    return () => { ring.stop(); ring2Anim.stop(); shakeAnim.stop(); };
+function ChamadasHistorico({ T, nav }) {
+  const [calls, setCalls] = useState(null); // null = carregando
+  const load = useCallback(() => {
+    blueAPI.callsHistorico()
+      .then((d) => setCalls(Array.isArray(d?.calls) ? d.calls.filter((c) => c && c.other) : []))
+      .catch(() => setCalls([]));
   }, []);
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  const ringStyle = (v) => ({
-    position: 'absolute', width: 120, height: 120, borderRadius: 60,
-    borderWidth: 2, borderColor: T.accent,
-    opacity: v.interpolate({ inputRange: [0, 0.7, 1], outputRange: [0.55, 0.18, 0] }),
-    transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1.9] }) }],
-  });
+  const ligar = (c, tipo) => {
+    if (!c.other?.user_id) return;
+    nav.navigate('Call', { mode: 'outgoing', tipo, other: c.other });
+  };
+
+  if (calls === null) return <ActivityIndicator color={T.accent} style={{ marginTop: 40 }} />;
+
+  if (!calls.length) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, gap: 10 }}>
+        <Text style={{ fontSize: 46 }}>📞</Text>
+        <Text style={{ color: T.text, fontSize: 16, fontWeight: '800', fontFamily: T.font }}>Nenhuma chamada ainda</Text>
+        <Text style={{ color: T.textSecondary, fontSize: 13, textAlign: 'center', lineHeight: 19, fontFamily: T.font }}>
+          Abre uma conversa e toca no 📞 ou 📹 no topo pra fazer sua primeira chamada. Só entre contatos do BlueChat.
+        </Text>
+      </View>
+    );
+  }
 
   return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 36 }}>
-      <View style={{ width: 160, height: 160, alignItems: 'center', justifyContent: 'center', marginBottom: 26 }}>
-        <Animated.View style={ringStyle(ring1)} />
-        <Animated.View style={ringStyle(ring2)} />
-        <Animated.View style={{
-          width: 92, height: 92, borderRadius: 46, alignItems: 'center', justifyContent: 'center',
-          backgroundColor: T.accent + '24', borderWidth: 1, borderColor: T.accent + '73',
-          transform: [{ rotate: shake.interpolate({ inputRange: [-8, 8], outputRange: ['-8deg', '8deg'] }) }],
-        }}>
-          <Text style={{ fontSize: 40 }}>📞</Text>
-        </Animated.View>
-      </View>
-      <Animated.View style={{ opacity: fade, alignItems: 'center' }}>
-        <Text style={{ color: T.text, fontSize: 20, fontWeight: '800', marginBottom: 8, fontFamily: T.font }}>Chamadas estão chegando</Text>
-        <Text style={{ color: T.textSecondary, fontSize: 13.5, textAlign: 'center', lineHeight: 20, marginBottom: 18, fontFamily: T.font }}>
-          Muito em breve você vai poder ligar pros seus contatos direto daqui:
-        </Text>
-        {[['🎙️', 'Chamadas de voz com seus contatos'], ['📹', 'Chamadas de vídeo 1:1'], ['🔒', 'Direto do chat, com quem você já conversa']].map(([ic, label]) => (
-          <View key={label} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            <Text style={{ fontSize: 17 }}>{ic}</Text>
-            <Text style={{ color: T.text, fontSize: 13.5, fontFamily: T.font }}>{label}</Text>
-          </View>
-        ))}
-        <View style={{ marginTop: 14, backgroundColor: T.accent + '1f', borderWidth: 1, borderColor: T.accent + '59', borderRadius: 100, paddingHorizontal: 16, paddingVertical: 7 }}>
-          <Text style={{ color: T.accent, fontSize: 11.5, fontWeight: '700', letterSpacing: 0.6 }}>EM DESENVOLVIMENTO ✨</Text>
-        </View>
-      </Animated.View>
-    </View>
+    <FlatList
+      data={calls}
+      keyExtractor={(c) => String(c.id)}
+      contentContainerStyle={{ paddingBottom: 140 }}
+      renderItem={({ item: c }) => {
+        const perdida = (c.direcao === 'in' && (c.status === 'missed' || c.status === 'declined'));
+        const nome = c.other?.display_name || ('@' + (c.other?.username || 'usuário'));
+        const seta = c.direcao === 'out' ? '↗' : '↙';
+        const detalhe = c.status === 'ended'
+          ? `${seta} ${fmtDurCall(c.duration_s)} · ${fmtHora(c.started_at)}`
+          : `${seta} ${perdida ? 'Perdida' : c.status === 'cancelled' ? 'Cancelada' : c.status === 'declined' ? 'Recusada' : 'Não atendida'} · ${fmtHora(c.started_at)}`;
+        return (
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, gap: 12, borderBottomWidth: 1, borderBottomColor: T.border }}
+            onPress={() => ligar(c, c.tipo)}>
+            <Avatar uri={c.other?.avatar_url} initial={nome} size={46} />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={{ color: perdida ? '#ef4444' : T.text, fontSize: 14, fontWeight: '700', fontFamily: T.font }} numberOfLines={1}>{nome}</Text>
+              <Text style={{ color: perdida ? 'rgba(239,68,68,0.8)' : T.textSecondary, fontSize: 12, marginTop: 2, fontFamily: T.font }}>{detalhe}</Text>
+            </View>
+            <TouchableOpacity hitSlop={8} onPress={() => ligar(c, c.tipo)}>
+              <Ionicons name={c.tipo === 'video' ? 'videocam' : 'call'} size={21} color={T.accent} />
+            </TouchableOpacity>
+          </TouchableOpacity>
+        );
+      }}
+    />
   );
 }
