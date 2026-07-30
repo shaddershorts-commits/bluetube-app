@@ -2,7 +2,13 @@ export default {
     expo: {
           name: 'BlueTube',
           slug: 'bluetube',
-          version: '1.5.1',
+          // 1.5.1 → 1.5.2: primeira mudança NATIVA desde o lançamento
+          // (google-services.json / FCM). runtimeVersion segue a version, então
+          // os updates OTA publicados no runtime 1.5.1 NÃO alcançam este build:
+          // depois de gerar o AAB é obrigatório republicar `eas update` pra
+          // nascer o runtime 1.5.2, senão quem instalar o 152 fica sem os
+          // ajustes já publicados.
+          version: '1.5.2',
           // SDK 53 liga a nova arquitetura por padrão; mantida DESLIGADA no
           // lançamento pra não somar variável de risco (libs validadas na antiga).
           newArchEnabled: false,
@@ -47,7 +53,15 @@ export default {
                   package: 'com.bluetube.app',
                   // versionCode manual (autoIncrement não suporta app.config.js dinâmico).
                   // Regra: +1 a cada AAB enviado pra loja. 1.5.1 → 151 (SDK 53, 16 KB).
-                  versionCode: 151,
+                  // 152 = FCM/push (projeto Firebase bluetube-143e8).
+                  versionCode: 152,
+                  // Firebase Cloud Messaging: SEM este arquivo dentro do build o
+                  // aparelho não consegue nem PEDIR token de push —
+                  // getExpoPushTokenAsync() estoura e o registro morre calado.
+                  // Era essa a raiz de `user_push_tokens` vazia no app inteiro.
+                  // Não é segredo (viaja dentro de todo APK); o que é segredo é
+                  // a chave de serviço, que fica só no EAS.
+                  googleServicesFile: './google-services.json',
                   // Permissões mínimas (política Play 2025/26): foto/vídeo via
                   // Photo Picker do sistema (SEM READ_MEDIA_*); storage legacy fora.
                   permissions: [

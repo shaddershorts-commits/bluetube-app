@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "570766760978",
+    "project_id": "bluetube-143e8",
+    "storage_bucket": "bluetube-143e8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:570766760978:android:60c8f69d085835025e8ccb",
+        "android_client_info": {
+          "package_name": "com.bluetube.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCQAVe5rb9TwNTkDxkeWxq0BYkSHZShBKs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
