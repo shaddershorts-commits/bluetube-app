@@ -74,15 +74,25 @@ export default function CallScreen({ route }) {
   const localRef = useRef(null);
   const chanRef = useRef(null);
   const ringTimer = useRef(null);
+  const connTimer = useRef(null); // watchdog do "Conectando…" (ICE que nunca fecha)
   const secsTimer = useRef(null);
   const finishedRef = useRef(false);
+  const answeringRef = useRef(false); // dois toques no atender = 2ª chamada à API derrubava a 1ª
   const pendingIce = useRef([]); // ICE que chegou antes do remoteDescription
+  // O cleanup do useEffect de montagem roda com closure da PRIMEIRA render —
+  // `fase` lá dentro seria sempre 'ringing'. O ref acompanha o estado real.
+  const faseRef = useRef('ringing');
+  useEffect(() => { faseRef.current = fase; }, [fase]);
+  // Identidade REAL do outro lado: o payload do toque é forjável (canal
+  // broadcast é aberto) — quem manda é o que o banco diz via callEstado.
+  const [outro, setOutro] = useState(other || null);
 
   // ── encerramento único (idempotente) ────────────────────────────────────
   const finalizar = useCallback(async (motivo, chamarApi) => {
     if (finishedRef.current) return;
     finishedRef.current = true;
     clearTimeout(ringTimer.current);
+    clearTimeout(connTimer.current);
     clearInterval(secsTimer.current);
     try { chanRef.current?.send({ type: 'broadcast', event: 'end', payload: { from: myId, motivo } }); } catch (e) {}
     try {
@@ -127,6 +137,11 @@ export default function CallScreen({ route }) {
     pc.addEventListener('connectionstatechange', () => {
       const st = pc.connectionState;
       if (st === 'connected') {
+        // conectou de verdade: mata o timer de "não atendeu" (sem isso TODA
+        // chamada atendida caía aos 45s no lado de quem ligou) e o watchdog
+        // do connecting
+        clearTimeout(ringTimer.current);
+        clearTimeout(connTimer.current);
         setFase('active');
         setStatusMsg('');
         if (!secsTimer.current) secsTimer.current = setInterval(() => setSecs((s) => s + 1), 1000);
@@ -156,6 +171,11 @@ export default function CallScreen({ route }) {
       // callee atendeu → caller cria e manda a oferta
       if (!souCaller) return;
       try {
+        // atendeu: o timer de "não atendeu" morre AQUI (não só no connected —
+        // se o ICE demorar 20s, o timer de 45s ainda estaria armado por baixo)
+        clearTimeout(ringTimer.current);
+        clearTimeout(connTimer.current);
+        connTimer.current = setTimeout(() => finalizar('Não foi possível conectar', 'encerrar'), 30000);
         setFase('connecting'); setStatusMsg('Conectando…');
         try { InCallManager?.stopRingback?.(); } catch (e) {}
         const pc = pcRef.current;
@@ -200,7 +220,11 @@ export default function CallScreen({ route }) {
       if (souCaller) finalizar('Chamada recusada', null);
     });
     ch.on('broadcast', { event: 'end' }, ({ payload }) => {
-      if (payload?.from !== myId) finalizar('Chamada encerrada', 'encerrar');
+      if (payload?.from === myId) return;
+      // 'encerrar' na API só se a chamada chegou a ser atendida — em ringing
+      // isso gravava 'ended' com duração 0 e engolia a "chamada perdida"
+      const atendida = faseRef.current === 'active' || faseRef.current === 'connecting';
+      finalizar('Chamada encerrada', atendida ? 'encerrar' : null);
     });
     ch.on('broadcast', { event: 'cancel' }, () => {
       if (!souCaller) finalizar(`${other?.display_name || 'A pessoa'} desligou`, null);
@@ -221,6 +245,13 @@ export default function CallScreen({ route }) {
       }
       callIdRef.current = r.call_id;
       const stream = await abrirMidia();
+      // usuário pode ter desistido ENQUANTO o diálogo de permissão estava na
+      // tela — sem este check a câmera ficava capturada depois do goBack
+      if (finishedRef.current) {
+        try { stream.getTracks().forEach((t) => t.stop()); } catch (e) {}
+        try { await blueAPI.callCancelar(r.call_id); } catch (e) {}
+        return;
+      }
       montarPeer(stream);
       entrarNoCanal(true);
       // toca no aparelho do outro se o app dele estiver ABERTO (push cobre fechado)
@@ -246,24 +277,45 @@ export default function CallScreen({ route }) {
   // ── fluxo de QUEM RECEBE ────────────────────────────────────────────────
   const prepararComoCallee = useCallback(async () => {
     try {
-      // a chamada ainda existe? (posso ter chegado atrasado pelo push)
+      // A chamada ainda existe E está tocando? O guard antigo era
+      // `status && status !== 'ringing'` — chamada INEXISTENTE (call_id
+      // forjado num broadcast, canal é aberto) vinha sem status e PASSAVA:
+      // o aparelho tocava 45s por um toque falso. Agora só segue com
+      // status === 'ringing' vindo do banco.
       const est = await blueAPI.callEstado(callIdRef.current);
-      if (est?.call?.status && est.call.status !== 'ringing') {
-        finalizar(est.call.status === 'missed' ? 'Chamada perdida' : 'Chamada já encerrada', null);
+      const st = est?.call?.status;
+      if (st !== 'ringing') {
+        finalizar(st === 'missed' ? 'Chamada perdida' : 'Chamada já encerrada', null);
         return;
+      }
+      if (finishedRef.current) return;
+      // identidade exibida = a do BANCO, não a do payload (anti-spoof)
+      if (est.call.caller_id && est.call.caller_id !== other?.user_id) {
+        blueAPI.perfil(est.call.caller_id)
+          .then((p) => { const pr = p?.profile || p; if (pr?.user_id && !finishedRef.current) setOutro(pr); })
+          .catch(() => {});
       }
       entrarNoCanal(false);
       try { InCallManager?.startRingtone?.('_DEFAULT_'); } catch (e) {}
       ringTimer.current = setTimeout(() => finalizar('Chamada perdida', null), RING_TIMEOUT_S * 1000);
     } catch (e) { finalizar('Erro na chamada', null); }
-  }, [entrarNoCanal, finalizar]);
+  }, [entrarNoCanal, finalizar, other]);
 
   const atender = async () => {
+    // dois toques rápidos = segunda ida à API voltava 409 e DERRUBAVA a
+    // chamada recém-atendida (fora o leak de stream/peer duplicados)
+    if (answeringRef.current || finishedRef.current) return;
+    answeringRef.current = true;
     try {
       clearTimeout(ringTimer.current);
       try { InCallManager?.stopRingtone?.(); InCallManager?.start?.({ media: isVideo ? 'video' : 'audio' }); } catch (e) {}
       setFase('connecting'); setStatusMsg('Conectando…');
+      connTimer.current = setTimeout(() => finalizar('Não foi possível conectar', 'encerrar'), 30000);
       const stream = await abrirMidia();
+      if (finishedRef.current) { // caller cancelou enquanto a permissão abria
+        try { stream.getTracks().forEach((t) => t.stop()); } catch (e) {}
+        return;
+      }
       montarPeer(stream);
       const r = await blueAPI.callAtender(callIdRef.current);
       if (r?.error) { finalizar(r.error, null); return; }
@@ -310,11 +362,22 @@ export default function CallScreen({ route }) {
   useEffect(() => {
     if (mode === 'outgoing') iniciarComoCaller();
     else prepararComoCallee();
-    return () => { finalizar('Chamada encerrada', fase === 'active' ? 'encerrar' : null); };
+    return () => {
+      // Rede de segurança do desmonte (back físico do Android etc). A closure
+      // aqui é da PRIMEIRA render — `fase` direto seria sempre 'ringing' e a
+      // API certa nunca era chamada; faseRef carrega o valor real.
+      const f = faseRef.current;
+      const api = (f === 'active' || f === 'connecting')
+        ? 'encerrar'
+        : f === 'ringing'
+          ? (mode === 'outgoing' ? 'cancelar' : 'recusar')
+          : null;
+      finalizar('Chamada encerrada', api);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const nome = other?.display_name || (other?.username ? '@' + other.username : 'Chamada');
+  const nome = outro?.display_name || (outro?.username ? '@' + outro.username : 'Chamada');
   const emChamada = fase === 'active';
   const recebendo = mode === 'incoming' && fase === 'ringing';
 
@@ -335,7 +398,7 @@ export default function CallScreen({ route }) {
       {/* identidade + status (voz sempre; vídeo enquanto não conecta) */}
       {(!isVideo || !remoteStreamUrl) && (
         <View style={styles.centro}>
-          <Avatar uri={other?.avatar_url} initial={nome} size={110} />
+          <Avatar uri={outro?.avatar_url} initial={nome} size={110} />
           <Text style={styles.nome}>{nome}</Text>
           <Text style={styles.status}>
             {emChamada ? fmtDur(secs) : statusMsg}

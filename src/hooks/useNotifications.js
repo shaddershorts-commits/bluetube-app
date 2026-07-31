@@ -29,8 +29,8 @@ export function useNotifications(userToken) {
   }, [userToken]);
 
   useEffect(() => {
-    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-      const data = response.notification.request.content.data || {};
+    const rotear = (response) => {
+      const data = response?.notification?.request?.content?.data || {};
       // Push de CHAMADA: toca direto pra tela de atender (o CallScreen valida
       // na API se ainda está tocando — chegar atrasado mostra "perdida").
       if (data.tipo === 'call' && data.call_id) {
@@ -61,7 +61,21 @@ export function useNotifications(userToken) {
       }
       const url = data.url;
       if (url) Linking.openURL(url);
-    });
+    };
+
+    const sub = Notifications.addNotificationResponseReceivedListener(rotear);
+
+    // App aberto PELO toque na notificação (estava morto): o listener acima
+    // não recebe a resposta que lançou o app — ela vem por aqui. Janela de
+    // 60s: resposta velha (abrir o app horas depois) não re-dispara nada.
+    Notifications.getLastNotificationResponseAsync()
+      .then((resp) => {
+        if (!resp) return;
+        const idadeMs = Date.now() - (resp.notification?.date ? new Date(resp.notification.date).getTime() : 0);
+        if (idadeMs < 60000) rotear(resp);
+      })
+      .catch(() => {});
+
     return () => sub.remove();
   }, []);
 }
