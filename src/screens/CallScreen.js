@@ -265,7 +265,13 @@ export default function CallScreen({ route }) {
           setTimeout(() => { try { supabase.removeChannel(ringCh); } catch (e) {} }, 4000);
         }
       });
-      try { InCallManager?.start?.({ media: isVideo ? 'video' : 'audio' }); InCallManager?.startRingback?.('_DEFAULT_'); } catch (e) {}
+      // '_DTMF_' (NÃO '_DEFAULT_'): no Android o incall-manager define
+      // defaultRingbackUri = Settings.System.DEFAULT_RINGTONE_URI, ou seja,
+      // '_DEFAULT_' toca o TOQUE DO APARELHO — quem liga ouvia o mesmo som de
+      // chamada recebida. '_DTMF_' cai no ToneGenerator
+      // (TONE_CDMA_NETWORK_USA_RINGBACK) = o "tuuu… tuuu" de chamando, em loop
+      // até stopRingback. iOS também trata '_DTMF_'.
+      try { InCallManager?.start?.({ media: isVideo ? 'video' : 'audio' }); InCallManager?.startRingback?.('_DTMF_'); } catch (e) {}
       ringTimer.current = setTimeout(() => finalizar('Não atendeu', 'cancelar'), RING_TIMEOUT_S * 1000);
     } catch (e) {
       Alert.alert('Não deu pra ligar', e.message?.includes('permission') || e.message?.includes('Permission')
