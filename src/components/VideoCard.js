@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions, Share, Animated, Pressable, PanResponder, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Video, ResizeMode } from 'expo-av';
@@ -75,6 +75,21 @@ export default function VideoCard({ video, index, cardHeight, activeOverride, ne
   const heartOpacity = useRef(new Animated.Value(0)).current;
   const lastTapRef = useRef(0);
 
+  // ── TEMPO ASSISTIDO (fix 2026-08-03) ────────────────────────────────────
+  // O backend só valida uma view se ela vier com watch_duration>=1s ou
+  // completion_pct>=25 ("régua Equilibrada", 17/07) — e o app NUNCA mandava
+  // esses campos. Resultado medido no banco: 0 de 1000 views passaram no
+  // portão, e TODO vídeo publicado depois de 17/07 ficou com 0 views pra
+  // sempre. Como o Descobrir filtra min_views=100 e o ranking usa
+  // score/views, vídeo novo virava invisível e o criador desistia.
+  // Estes refs acumulam o que foi REALMENTE assistido e viram o sinal de
+  // retenção (completion_rate/skip_rate) que o algoritmo usa pra ordenar.
+  const posMsRef = useRef(0);        // posição máxima alcançada
+  const durMsRef = useRef(0);        // duração real do vídeo
+  const watchMsRef = useRef(0);      // tempo somado de reprodução
+  const lastTickRef = useRef(0);     // último instante contabilizado
+  const viewSentRef = useRef(false); // uma view por card por sessão
+
   // Autoplay robusto em mobile: se o device bloquear play com audio
   // (algumas versoes de Android/iOS em low-power ou com some restricoes
   // de media session), retenta mutado. Mesma cascata do web:
@@ -82,31 +97,77 @@ export default function VideoCard({ video, index, cardHeight, activeOverride, ne
   useEffect(() => {
     if (!videoRef.current) return;
     let cancelled = false;
-    const sendView = () => {
-      if (_viewedThisSession.has(video.id)) return;
-      _viewedThisSession.add(video.id);
-      blueAPI.interact('view', video.id, { user_id: user?.id, session_id: SESSION_ID }).catch(() => {});
-    };
     if (isActive) {
+      lastTickRef.current = Date.now();
       (async () => {
         try {
           await videoRef.current.playAsync();
-          if (!cancelled) sendView();
         } catch (e) {
           // Fallback: muta e tenta de novo
           try {
             await videoRef.current.setIsMutedAsync(true);
             if (!cancelled) setMuted(true);
             await videoRef.current.playAsync();
-            if (!cancelled) sendView();
           } catch (_) {}
         }
       })();
     } else {
+      lastTickRef.current = 0;
       videoRef.current.pauseAsync().catch(() => {});
+      enviarView(); // saiu do card: manda o que foi assistido de verdade
     }
     return () => { cancelled = true; };
   }, [isActive]);
+
+  // Manda a view UMA vez, com o tempo realmente assistido. Disparada quando o
+  // usuário rola pro próximo, quando o vídeo termina, ou aos 15s de exibição
+  // (rede de segurança pra quem fica parado no mesmo vídeo e fecha o app).
+  const enviarView = useCallback(() => {
+    if (viewSentRef.current || _viewedThisSession.has(video.id)) return;
+    const watchS = Math.round(watchMsRef.current / 1000);
+    if (watchS < 1) return; // menos de 1s não é view — mesma régua do backend
+    viewSentRef.current = true;
+    _viewedThisSession.add(video.id);
+    const durS = Math.round((durMsRef.current || (video.duration || 0) * 1000) / 1000);
+    const pct = durS > 0 ? Math.min(100, Math.round((posMsRef.current / 1000 / durS) * 100)) : 0;
+    blueAPI.interact('view', video.id, {
+      user_id: user?.id,
+      session_id: SESSION_ID,
+      watch_duration: watchS,
+      video_duration: durS,
+      completion_pct: pct,
+    }).catch(() => {});
+  }, [video.id, video.duration, user?.id]);
+
+  // Acumula progresso a cada tick do player (~250ms no expo-av).
+  const handleStatus = useCallback((st) => {
+    if (!st?.isLoaded) return;
+    if (st.durationMillis) durMsRef.current = st.durationMillis;
+    if (st.positionMillis > posMsRef.current) posMsRef.current = st.positionMillis;
+    if (st.isPlaying) {
+      const agora = Date.now();
+      if (lastTickRef.current) {
+        const delta = agora - lastTickRef.current;
+        // ignora saltos (app em background, seek) — no máximo 1s por tick
+        if (delta > 0 && delta < 1500) watchMsRef.current += delta;
+      }
+      lastTickRef.current = agora;
+      // Rede de segurança pra quem fica parado e fecha o app. 30s (não 15s):
+      // disparar cedo demais congelaria o completion_pct de vídeo longo num
+      // valor baixo, e o didJustFinish/rolagem já cobrem o caso normal.
+      if (watchMsRef.current >= 30000) enviarView();
+    } else {
+      lastTickRef.current = 0;
+    }
+    // terminou de assistir: completion real, sinal mais forte pro ranking
+    if (st.didJustFinish) {
+      posMsRef.current = durMsRef.current || posMsRef.current;
+      enviarView();
+    }
+  }, [enviarView]);
+
+  // Desmontou sem rolar (trocou de aba, fechou a tela): não perde o sinal
+  useEffect(() => () => { enviarView(); }, [enviarView]);
 
   // Saiu do card (rolou pra outro) → limpa estados de gesto (pausa manual e 2x)
   useEffect(() => {
@@ -272,6 +333,8 @@ export default function VideoCard({ video, index, cardHeight, activeOverride, ne
             shouldPlay={isActive}
             isMuted={muted}
             onLoad={handleVideoLoad}
+            onPlaybackStatusUpdate={handleStatus}
+            progressUpdateIntervalMillis={250}
           />
         ) : video.thumbnail_url ? (
           <Image source={{ uri: video.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
