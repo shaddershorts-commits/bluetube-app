@@ -109,23 +109,28 @@ export default function SetupPerfilScreen({ navigation }) {
                           if (!p.granted) { Alert.alert('Permissao negada'); return; }
                           result = await ImagePicker.launchCameraAsync({ mediaTypes: 'Images', quality: 0.7, allowsEditing: true, aspect: [1,1] });
                 } else {
-                          const p = await ImagePicker.requestMediaLibraryPermissionsAsync();
-                          if (!p.granted) { Alert.alert('Permissao negada'); return; }
+                          // Sem requestMediaLibraryPermissionsAsync: READ_MEDIA_*
+                          // está em blockedPermissions (política Photo & Video do
+                          // Google), então a permissão era NEGADA SEMPRE e o
+                          // usuário nunca conseguia escolher a foto — outra razão
+                          // dos 7% de perfis com avatar. O Photo Picker do sistema
+                          // não precisa de permissão.
                           result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'Images', quality: 0.7, allowsEditing: true, aspect: [1,1] });
                 }
                 if (!result.canceled && result.assets?.[0]?.uri) setAvatar(result.assets[0].uri);
         } catch { Alert.alert('Erro', 'Nao foi possivel acessar a imagem.'); }
   };
 
-  const uploadAvatar = async (uri) => {
-        // TODO: blue-upload.js precisa ter action=upload-avatar; se nao existir, retorna null silenciosamente
+  // FIX 03/08/2026: subia o avatar por multipart pra `blue-upload
+  // action=upload-avatar` — action que NUNCA EXISTIU (havia até um TODO
+  // admitindo). Falhava calada e retornava null, por isso só 7% dos perfis
+  // tinham foto. O caminho que funciona é o mesmo do EditProfile: base64 no
+  // update do perfil, via blueAPI (que manda o token).
+  const lerAvatarBase64 = async (uri) => {
         try {
-                const fd = new FormData();
-                fd.append('file', { uri, name: 'avatar.jpg', type: 'image/jpeg' });
-                fd.append('action', 'upload-avatar');
-                const r = await fetch(`${API_BASE}/blue-upload`, { method: 'POST', body: fd });
-                const d = await r.json().catch(() => ({}));
-                return d.url || d.avatar_url || null;
+                const FileSystem = require('expo-file-system');
+                const b64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+                return `data:image/jpeg;base64,${b64}`;
         } catch { return null; }
   };
 
@@ -157,16 +162,20 @@ export default function SetupPerfilScreen({ navigation }) {
   const saveStep = async () => {
         setLoading(true);
         try {
+                // ATENÇÃO (fix 03/08/2026): estes passos usavam fetch cru SEM
+                // TOKEN — o backend rejeitava e NADA era salvo. Username, nome,
+                // bio e foto do onboarding iam pro ralo em silêncio. Agora vão
+                // por blueAPI.atualizarPerfil, que anexa o token.
                 if (step === 1) {
                           if (usernameStatus !== 'ok') { setLoading(false); return; }
-                          await fetch(`${API_BASE}/blue-profile`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ action: 'update', username }) }).catch(() => {});
+                          await blueAPI.atualizarPerfil({ username }).catch(() => {});
                 }
                 if (step === 2) {
-                          await fetch(`${API_BASE}/blue-profile`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ action: 'update', nome, bio }) }).catch(() => {});
+                          await blueAPI.atualizarPerfil({ display_name: nome, bio }).catch(() => {});
                 }
                 if (step === 3 && avatar) {
-                          const url = await uploadAvatar(avatar);
-                          if (url) await fetch(`${API_BASE}/blue-profile`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ action: 'update', avatar_url: url }) }).catch(() => {});
+                          const b64 = await lerAvatarBase64(avatar);
+                          if (b64) await blueAPI.atualizarPerfil({ avatar_data: b64 }).catch(() => {});
                 }
                 if (step === 4 && nichosSel.length > 0) await blueAPI.onboardingInteresses(nichosSel);
                 if (step === 6) {

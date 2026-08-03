@@ -112,19 +112,23 @@ export default function CameraScreen() {
     } catch (e) { Alert.alert('Erro', e.message || 'Não deu pra abrir a galeria.'); }
   };
 
-  // ── STORIE: publica no Status do BlueChat ──
+  // ── STORIE: publica no PERFIL PÚBLICO (quem te segue vê) ──
+  // FIX 2026-08-03: mandava audience:'status', que é o Status do BlueChat —
+  // ou seja, o botão PRINCIPAL de criar publicava só pros contatos do chat.
+  // Regra correta: aqui é storie público (audience 'stories'); Status do chat
+  // só é publicado pelo botão da aba Status, DENTRO do chat.
   const publicarStorie = async (uri, tipo, mime) => {
     setPublicando(true);
     const r = await blueAPI.storyCriar(uri, {
-      tipo, mime, audience: 'status',
+      tipo, mime, audience: 'stories',
       duracao: tipo === 'video' ? 15 : 5,
     }).catch((e) => ({ error: e.message }));
     setPublicando(false);
     if (r?.error) { Alert.alert('Não deu pra postar', r.error); return; }
     setPreview(null);
     setEscolha(null);
-    Alert.alert('✨ Storie publicado!', 'Seus contatos podem ver por 24 horas.');
-    nav.navigate('Chat');
+    Alert.alert('✨ Storie publicado!', 'Ele aparece no seu perfil por 24 horas pra quem te segue.');
+    nav.navigate('Feed');
   };
 
   const publicarPreview = () => {
@@ -263,7 +267,7 @@ export default function CameraScreen() {
             <Text style={styles.chooserIcon}>✨</Text>
             <View style={{ flex: 1 }}>
               <Text style={styles.chooserCardTitle}>Storie</Text>
-              <Text style={styles.chooserCardSub}>Some em 24h, só seus contatos veem · até 3 min</Text>
+              <Text style={styles.chooserCardSub}>Aparece no seu perfil pra quem te segue · some em 24h</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.4)" />
           </TouchableOpacity>
