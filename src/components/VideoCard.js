@@ -89,6 +89,40 @@ export default function VideoCard({ video, index, cardHeight, activeOverride, ne
   const watchMsRef = useRef(0);      // tempo somado de reprodução
   const lastTickRef = useRef(0);     // último instante contabilizado
   const viewSentRef = useRef(false); // uma view por card por sessão
+  const idMedidoRef = useRef(video.id);
+
+  // ZERAR AO TROCAR DE VÍDEO — obrigatório porque o feed usa FlashList, que
+  // RECICLA a instância do componente pra outro vídeo em vez de remontar.
+  // Sem isto: viewSentRef chegava `true` do vídeo anterior e a view do novo
+  // NUNCA era enviada; e watchMs/posMs vazavam de um vídeo pro outro,
+  // gravando tempo assistido de A no vídeo B. Bug introduzido junto com a
+  // medição hoje (03/08) e pego na verificação do dado real.
+  if (idMedidoRef.current !== video.id) {
+    const anterior = idMedidoRef.current;
+    // DESPACHA o que ficou pendente do vídeo ANTERIOR antes de zerar. O
+    // cleanup do useEffect só roda depois deste render — se zerássemos aqui,
+    // ele encontraria watchMs=0 e a view do vídeo que acabou de sair sumiria.
+    // Enviado direto (não via enviarView) porque aquele callback já está
+    // ligado ao vídeo NOVO neste ponto.
+    const pendenteS = Math.round(watchMsRef.current / 1000);
+    if (!viewSentRef.current && pendenteS >= 1 && anterior && !_viewedThisSession.has(anterior)) {
+      _viewedThisSession.add(anterior);
+      const dAnt = Math.round(durMsRef.current / 1000);
+      blueAPI.interact('view', anterior, {
+        user_id: user?.id,
+        session_id: SESSION_ID,
+        watch_duration: pendenteS,
+        video_duration: dAnt,
+        completion_pct: dAnt > 0 ? Math.min(100, Math.round((posMsRef.current / 1000 / dAnt) * 100)) : 0,
+      }).catch(() => {});
+    }
+    idMedidoRef.current = video.id;
+    posMsRef.current = 0;
+    durMsRef.current = 0;
+    watchMsRef.current = 0;
+    lastTickRef.current = 0;
+    viewSentRef.current = false;
+  }
 
   // Autoplay robusto em mobile: se o device bloquear play com audio
   // (algumas versoes de Android/iOS em low-power ou com some restricoes
