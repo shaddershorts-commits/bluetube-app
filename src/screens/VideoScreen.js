@@ -130,7 +130,12 @@ export default function VideoScreen({ route, navigation }) {
               <VideoCard
                 video={item} index={index} cardHeight={CARD_H}
                 activeOverride={index === activeIdx}
-                nearActive={Math.abs(index - activeIdx) <= 1}
+                // Pré-carga ASSIMÉTRICA: 1 atrás, 2 à frente. O dedo vai pra
+                // frente — adiantar o próximo é o que tira a espera. Manter
+                // simétrico gastava um player com o vídeo que já passou.
+                // 4 players no total: dentro do limite de codecs do Android
+                // (o problema histórico era montar player em TODO card).
+                nearActive={index >= activeIdx - 1 && index <= activeIdx + 2}
               />
             );
           }}

@@ -54,9 +54,16 @@ export default function VideoCard({ video, index, cardHeight, activeOverride, ne
   // PLAYER só monta perto do ativo (ativo ±1). Longe = thumbnail leve.
   // Antes TODO card montava um <Video> → N players carregando juntos no
   // scroll = jank + ExoPlayer esgotado no Android (parava de reproduzir).
+  // idx numérico garantido: se currentIndex vier inválido (já aconteceu — ver
+  // utils/viewability.js), cai pro índice do próprio card em vez de virar NaN
+  // e impedir QUALQUER player de montar.
+  const idxAtual = Number.isFinite(currentIndex) ? currentIndex : index;
   const montaPlayer = typeof nearActive === 'boolean'
     ? nearActive
-    : (typeof activeOverride === 'boolean' ? activeOverride : Math.abs((currentIndex ?? 0) - index) <= 1);
+    : (typeof activeOverride === 'boolean'
+      ? activeOverride
+      // pré-carga assimétrica no feed também: 1 atrás, 2 à frente
+      : (index >= idxAtual - 1 && index <= idxAtual + 2));
   const videoRef = useRef(null);
   const nav = useNavigation();
   const { width: W } = useWindowDimensions();
@@ -91,6 +98,19 @@ export default function VideoCard({ video, index, cardHeight, activeOverride, ne
   const viewSentRef = useRef(false); // uma view por card por sessão
   const idMedidoRef = useRef(video.id);
   const pendenteRef = useRef(null); // view do vídeo anterior, enviada em efeito
+
+  // Qual vídeo já tem imagem na tela. Guardado por ID (não booleano) porque o
+  // FlashList RECICLA o card: um booleano ficaria `true` do vídeo anterior e o
+  // pôster do novo não apareceria — voltaria a tela preta. Comparando o id,
+  // reciclar zera sozinho, sem efeito e sem risco de estado velho.
+  const prontoIdRef = useRef(null);
+  const [, redesenhar] = useState(0);
+  const temImagem = prontoIdRef.current === video.id;
+  const marcarPronto = useCallback(() => {
+    if (prontoIdRef.current === video.id) return;
+    prontoIdRef.current = video.id;
+    redesenhar((n) => n + 1);
+  }, [video.id]);
 
   // ZERAR AO TROCAR DE VÍDEO — obrigatório porque o feed usa FlashList, que
   // RECICLA a instância do componente pra outro vídeo em vez de remontar.
@@ -381,6 +401,17 @@ export default function VideoCard({ video, index, cardHeight, activeOverride, ne
         onLongPress={handleLongPress}
         delayLongPress={LONG_PRESS_MS}
         style={StyleSheet.absoluteFill}>
+        {/* ── FIM DA TELA PRETA (fix 06/08) ──────────────────────────────
+            Antes era ou/ou: no instante em que o player montava, a thumbnail
+            SUMIA e entrava um <Video> sem nada pra mostrar até decodificar o
+            primeiro frame. Esse intervalo é a tela preta que o dono relatou —
+            em todo vídeo, toda rolagem. Pior: no Explorar a thumbnail já está
+            em cache (o grid acabou de exibi-la), então o app jogava fora
+            exatamente a imagem que resolveria.
+            Agora o pôster fica POR CIMA do player e só sai quando o vídeo
+            avisa que tem imagem (onReadyForDisplay). É o que TikTok e
+            Instagram fazem: nunca há preto, há o quadro parado virando vídeo. */}
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
         {montaPlayer ? (
           <Video
             ref={videoRef}
@@ -391,12 +422,17 @@ export default function VideoCard({ video, index, cardHeight, activeOverride, ne
             shouldPlay={isActive}
             isMuted={muted}
             onLoad={handleVideoLoad}
+            onReadyForDisplay={marcarPronto}
           />
-        ) : video.thumbnail_url ? (
-          <Image source={{ uri: video.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-        ) : (
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
-        )}
+        ) : null}
+        {video.thumbnail_url && !temImagem ? (
+          <Image
+            source={{ uri: video.thumbnail_url }}
+            style={StyleSheet.absoluteFill}
+            resizeMode={fitMode === ResizeMode.CONTAIN ? 'contain' : 'cover'}
+            pointerEvents="none"
+          />
+        ) : null}
       </Pressable>
 
       <LinearGradient
