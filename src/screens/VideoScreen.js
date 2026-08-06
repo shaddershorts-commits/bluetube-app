@@ -9,6 +9,7 @@
 //   cursor: (explore) continua a paginacao de onde o grid parou
 //   creator: (user) perfil dono dos videos — enriquece cards sem creator
 //   video_id: (single/deep-link) busca 1 video via API
+import { criarHandlerAtivo } from '../utils/viewability';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, useWindowDimensions } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
@@ -100,9 +101,9 @@ export default function VideoScreen({ route, navigation }) {
     loadingMoreRef.current = false;
   }, []);
 
-  const onViewableItemsChanged = useRef(({ viewableItems }) => {
-    if (viewableItems.length > 0) setActiveIdx(viewableItems[0].index);
-  }).current;
+  // index null vindo do FlashList zerava o ativo e travava TODOS os vídeos
+  // depois do primeiro (bug 06/08). O helper nunca troca por valor inválido.
+  const onViewableItemsChanged = useRef(criarHandlerAtivo(setActiveIdx)).current;
 
   return (
     <View style={styles.root} onLayout={(e) => setListH(e.nativeEvent.layout.height)}>

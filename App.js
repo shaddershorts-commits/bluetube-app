@@ -60,7 +60,11 @@ function App() {
       useFeedStore.getState().setAppActive(st === 'active');
       beat(st === 'active' ? 'online' : 'offline');
       // sessão eterna: renova o access token ao voltar pro app (throttle 5min)
-      if (st === 'active') useAuthStore.getState().refreshNow?.();
+      if (st === 'active') {
+        useAuthStore.getState().refreshNow?.();
+        // e tira do limbo se o boot ficou com token sem usuário (anti-zumbi)
+        useAuthStore.getState().revalidar?.();
+      }
     });
     return () => { sub.remove(); clearInterval(hb); };
   }, []);

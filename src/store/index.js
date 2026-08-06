@@ -55,7 +55,48 @@ export const useAuthStore = create((set) => ({
   logout: async () => {
     await SecureStore.deleteItemAsync('bt_token');
     await SecureStore.deleteItemAsync('bt_refresh_token');
-    set({ token: null, user: null });
+    set({ token: null, user: null, sessaoNaoVerificada: false });
+  },
+
+  // Tira o app do limbo "token sem usuário" (ver ANTI-ZUMBI no init).
+  // Chamada 4s depois do boot degradado e a cada volta pro foreground.
+  // Três desfechos, todos SAINDO do limbo:
+  //   ok            → preenche o usuário e segue logado
+  //   token morto   → logout limpo, a tela de login aparece
+  //   rede ainda ruim → continua degradado e tenta de novo depois
+  revalidar: async () => {
+    const { token, sessaoNaoVerificada } = useAuthStore.getState();
+    if (!token || !sessaoNaoVerificada) return;
+    try {
+      const { SUPABASE_URL, SUPABASE_ANON_KEY } = require('../constants');
+      const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        headers: { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + token },
+      });
+      if (r.ok) {
+        const u = await r.json();
+        set({ user: u, sessaoNaoVerificada: false });
+        useAuthStore.getState().loadBlocked?.();
+        return;
+      }
+      if (r.status === 401 || r.status === 403) {
+        // tenta uma última troca pelo refresh antes de desistir
+        const refresh = await SecureStore.getItemAsync('bt_refresh_token').catch(() => null);
+        if (refresh) {
+          const { refreshSession } = require('../api');
+          const rs = await refreshSession(refresh);
+          if (rs?.access_token) {
+            await SecureStore.setItemAsync('bt_token', rs.access_token).catch(() => {});
+            if (rs.refresh_token) await SecureStore.setItemAsync('bt_refresh_token', rs.refresh_token).catch(() => {});
+            set({ token: rs.access_token, user: rs.user || null, sessaoNaoVerificada: !rs.user });
+            return;
+          }
+        }
+        // token realmente morto: logout limpo — melhor pedir login do que
+        // deixar o app parecendo quebrado
+        await useAuthStore.getState().logout();
+      }
+      // 5xx / outros: segue degradado, tenta na próxima
+    } catch (e) { /* rede ainda ruim: tenta na próxima */ }
   },
   init: async () => {
     // Fix 1 PII (auditoria 2026-04-24): valida token salvo no startup.
@@ -138,12 +179,35 @@ export const useAuthStore = create((set) => ({
         }
       }
 
+      // ── ANTI-ZUMBI (fix 06/08/2026) ────────────────────────────────────
+      // Bug relatado: "abri o app, deslogou, não aparece vídeo nenhum, não
+      // aparece opção de login, mas consigo editar o perfil".
+      // Causa: quando o token expira E o refresh falha por REDE, o código
+      // acima restaura o token velho (certo — não deslogar por falha de
+      // rede), mas `validUser` fica NULL. O app então acredita estar logado
+      // (isGuest() olha só o token, então libera Perfil/Editar) enquanto
+      // TODA chamada autenticada devolve 401 — daí a tela vazia.
+      // Agora esse estado é marcado como NÃO VERIFICADO, e quem precisa de
+      // identidade real (isGuest) passa a exigir token E usuário.
+      const naoVerificado = !!validToken && !validUser;
+      if (naoVerificado) {
+        console.warn('[init] sessão não verificada (token sem usuário) — modo degradado');
+      }
+
       set({
         token: validToken || null,
         user: validUser,
+        sessaoNaoVerificada: naoVerificado,
         introSeen: introFlag === '1',
         isLoading: false,
       });
+
+      // CONTINGÊNCIA: tenta reverificar sozinho quando a rede voltar. Se o
+      // token estiver de fato morto, `revalidar` faz logout limpo e a tela de
+      // login aparece — em vez de deixar o app num limbo silencioso.
+      if (naoVerificado) {
+        setTimeout(() => { useAuthStore.getState().revalidar?.(); }, 4000);
+      }
       // Lista de bloqueados (moderação) — fire-and-forget pós-login
       if (validToken) useAuthStore.getState().loadBlocked();
     } catch (e) {

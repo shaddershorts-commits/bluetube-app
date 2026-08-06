@@ -2,7 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing, Modal, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import { COLORS } from '../constants';
+// COLORS_DARK, não COLORS (fix 06/08/2026): este popup aparece SEMPRE por
+// cima do feed, que é preto por design, e usa BlurView com tint="dark". Com a
+// paleta dinâmica, no tema claro o texto virava quase preto sobre o vidro
+// escuro — ilegível logo depois do login. Superfície escura pede texto claro,
+// independente do tema do app.
+import { COLORS_DARK as COLORS } from '../constants';
 import { colors as theme, blur as blurT, radius } from '../constants/theme';
 import blueAPI from '../api';
 

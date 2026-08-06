@@ -1,3 +1,4 @@
+import { criarHandlerAtivo } from '../utils/viewability';
 import { useEffect, useCallback, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Animated, useWindowDimensions, DeviceEventEmitter } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
@@ -138,11 +139,8 @@ export default function FeedScreen() {
     if (videos.length === 0) loadFeed(true);
   }, []);
 
-  const onViewableItemsChanged = useRef(({ viewableItems }) => {
-    if (viewableItems.length > 0) {
-      setCurrentIndex(viewableItems[0].index);
-    }
-  }).current;
+  // mesma proteção do VideoScreen: nunca deixa o ativo virar null/NaN
+  const onViewableItemsChanged = useRef(criarHandlerAtivo(setCurrentIndex)).current;
 
   if (isLoading && videos.length === 0) {
     return (

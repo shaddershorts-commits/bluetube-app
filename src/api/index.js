@@ -304,6 +304,29 @@ export const blueAPI = {
           if (!token) return { following: false };
           return api(`blue-follow?action=is-following&user_id=${encodeURIComponent(user_id)}&token=${encodeURIComponent(token)}`);
     },
+    // ── PROGRAMA DE MONETIZAÇÃO (marcos de 100 / 1.000 / 10.000 seguidores) ─
+    // O backend valida a elegibilidade — o app só apresenta. Se as tabelas do
+    // programa ainda não existirem, `programa_pronto:false` chega aqui e a
+    // tela desabilita os botões em vez de quebrar.
+    programaStatus: async () => {
+          const token = await getToken();
+          return api(`blue-monetizacao?action=programa-status&token=${encodeURIComponent(token || '')}`);
+    },
+    programaAplicar: async (marco) => {
+          const token = await getToken();
+          return api('blue-monetizacao', {
+                method: 'POST',
+                body: JSON.stringify({ action: 'programa-aplicar', token, marco }),
+          });
+    },
+    programaAvisar: async (marco) => {
+          const token = await getToken();
+          return api('blue-monetizacao', {
+                method: 'POST',
+                body: JSON.stringify({ action: 'programa-avisar', token, marco }),
+          });
+    },
+
     // Listas de seguidores / seguindo (paginadas, 30 por página).
     // O token é obrigatório: a lista de OUTRA pessoa só vem se ela me
     // adicionou nos contatos do BlueChat — senão o backend devolve
