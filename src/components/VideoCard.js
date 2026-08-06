@@ -90,6 +90,7 @@ export default function VideoCard({ video, index, cardHeight, activeOverride, ne
   const lastTickRef = useRef(0);     // último instante contabilizado
   const viewSentRef = useRef(false); // uma view por card por sessão
   const idMedidoRef = useRef(video.id);
+  const pendenteRef = useRef(null); // view do vídeo anterior, enviada em efeito
 
   // ZERAR AO TROCAR DE VÍDEO — obrigatório porque o feed usa FlashList, que
   // RECICLA a instância do componente pra outro vídeo em vez de remontar.
@@ -97,24 +98,19 @@ export default function VideoCard({ video, index, cardHeight, activeOverride, ne
   // NUNCA era enviada; e watchMs/posMs vazavam de um vídeo pro outro,
   // gravando tempo assistido de A no vídeo B. Bug introduzido junto com a
   // medição hoje (03/08) e pego na verificação do dado real.
+  // SÓ guarda o que ficou pendente — nada de rede aqui. Disparar fetch dentro
+  // do corpo do render é anti-padrão do React (roda em momentos imprevisíveis,
+  // inclusive em renders descartados). O envio acontece no efeito abaixo.
   if (idMedidoRef.current !== video.id) {
     const anterior = idMedidoRef.current;
-    // DESPACHA o que ficou pendente do vídeo ANTERIOR antes de zerar. O
-    // cleanup do useEffect só roda depois deste render — se zerássemos aqui,
-    // ele encontraria watchMs=0 e a view do vídeo que acabou de sair sumiria.
-    // Enviado direto (não via enviarView) porque aquele callback já está
-    // ligado ao vídeo NOVO neste ponto.
     const pendenteS = Math.round(watchMsRef.current / 1000);
     if (!viewSentRef.current && pendenteS >= 1 && anterior && !_viewedThisSession.has(anterior)) {
-      _viewedThisSession.add(anterior);
-      const dAnt = Math.round(durMsRef.current / 1000);
-      blueAPI.interact('view', anterior, {
-        user_id: user?.id,
-        session_id: SESSION_ID,
+      pendenteRef.current = {
+        video_id: anterior,
         watch_duration: pendenteS,
-        video_duration: dAnt,
-        completion_pct: dAnt > 0 ? Math.min(100, Math.round((posMsRef.current / 1000 / dAnt) * 100)) : 0,
-      }).catch(() => {});
+        video_duration: Math.round(durMsRef.current / 1000),
+        pos_ms: posMsRef.current,
+      };
     }
     idMedidoRef.current = video.id;
     posMsRef.current = 0;
@@ -153,17 +149,44 @@ export default function VideoCard({ video, index, cardHeight, activeOverride, ne
     return () => { cancelled = true; };
   }, [isActive]);
 
-  // Manda a view UMA vez, com o tempo realmente assistido. Disparada quando o
-  // usuário rola pro próximo, quando o vídeo termina, ou aos 15s de exibição
-  // (rede de segurança pra quem fica parado no mesmo vídeo e fecha o app).
-  const enviarView = useCallback(() => {
+  // Manda a view UMA vez, com o tempo realmente assistido.
+  //
+  // MEDIÇÃO SEM PONTE (reescrito 06/08 — eu tinha piorado a fluidez):
+  // a versão anterior usava onPlaybackStatusUpdate a cada 250ms. Cada
+  // atualização serializa um objeto de status inteiro atravessando a ponte JS
+  // — com 3 players montados eram ~12 travessias por SEGUNDO, sem parar, e
+  // vídeo é justamente o que não pode disputar a ponte. Agora o tempo
+  // assistido é medido por RELÓGIO (Date.now enquanto o card está ativo) e a
+  // posição/duração é lida UMA vez, na saída, via getStatusAsync().
+  // Zero tráfego contínuo, mesmo dado no fim.
+  const enviarView = useCallback(async () => {
     if (viewSentRef.current || _viewedThisSession.has(video.id)) return;
+    // fecha o cronômetro se ainda estiver correndo
+    if (lastTickRef.current) {
+      const delta = Date.now() - lastTickRef.current;
+      if (delta > 0 && delta < 10 * 60 * 1000) watchMsRef.current += delta;
+      lastTickRef.current = 0;
+    }
     const watchS = Math.round(watchMsRef.current / 1000);
     if (watchS < 1) return; // menos de 1s não é view — mesma régua do backend
     viewSentRef.current = true;
     _viewedThisSession.add(video.id);
-    const durS = Math.round((durMsRef.current || (video.duration || 0) * 1000) / 1000);
-    const pct = durS > 0 ? Math.min(100, Math.round((posMsRef.current / 1000 / durS) * 100)) : 0;
+
+    // uma única leitura do player (barata) pra saber onde parou
+    let posMs = posMsRef.current;
+    let durMs = durMsRef.current;
+    try {
+      const st = await videoRef.current?.getStatusAsync?.();
+      if (st?.isLoaded) {
+        if (st.durationMillis) durMs = st.durationMillis;
+        if (typeof st.positionMillis === 'number') posMs = Math.max(posMs, st.positionMillis);
+      }
+    } catch (e) { /* player já desmontou: usa o que temos */ }
+
+    const durS = Math.round((durMs || (video.duration || 0) * 1000) / 1000);
+    // sem posição confiável, o tempo assistido é a melhor estimativa
+    const base = posMs > 0 ? posMs / 1000 : watchS;
+    const pct = durS > 0 ? Math.min(100, Math.round((base / durS) * 100)) : 0;
     blueAPI.interact('view', video.id, {
       user_id: user?.id,
       session_id: SESSION_ID,
@@ -173,32 +196,33 @@ export default function VideoCard({ video, index, cardHeight, activeOverride, ne
     }).catch(() => {});
   }, [video.id, video.duration, user?.id]);
 
-  // Acumula progresso a cada tick do player (~250ms no expo-av).
-  const handleStatus = useCallback((st) => {
-    if (!st?.isLoaded) return;
-    if (st.durationMillis) durMsRef.current = st.durationMillis;
-    if (st.positionMillis > posMsRef.current) posMsRef.current = st.positionMillis;
-    if (st.isPlaying) {
-      const agora = Date.now();
-      if (lastTickRef.current) {
-        const delta = agora - lastTickRef.current;
-        // ignora saltos (app em background, seek) — no máximo 1s por tick
-        if (delta > 0 && delta < 1500) watchMsRef.current += delta;
-      }
-      lastTickRef.current = agora;
-      // Rede de segurança pra quem fica parado e fecha o app. 30s (não 15s):
-      // disparar cedo demais congelaria o completion_pct de vídeo longo num
-      // valor baixo, e o didJustFinish/rolagem já cobrem o caso normal.
-      if (watchMsRef.current >= 30000) enviarView();
-    } else {
-      lastTickRef.current = 0;
-    }
-    // terminou de assistir: completion real, sinal mais forte pro ranking
-    if (st.didJustFinish) {
-      posMsRef.current = durMsRef.current || posMsRef.current;
-      enviarView();
-    }
-  }, [enviarView]);
+  // Rede de segurança pra quem fica parado no mesmo vídeo e fecha o app:
+  // um único timer de 30s, em vez das ~12 travessias de ponte por segundo que
+  // o onPlaybackStatusUpdate custava.
+  useEffect(() => {
+    if (!isActive) return undefined;
+    const t = setTimeout(() => { enviarView(); }, 30000);
+    return () => clearTimeout(t);
+  }, [isActive, enviarView]);
+
+  // Envia a view que ficou pendente do vídeo ANTERIOR quando o FlashList
+  // reciclou este card. Fora do render, como manda o React.
+  useEffect(() => {
+    const p = pendenteRef.current;
+    if (!p) return;
+    pendenteRef.current = null;
+    _viewedThisSession.add(p.video_id);
+    const dur = p.video_duration;
+    blueAPI.interact('view', p.video_id, {
+      user_id: user?.id,
+      session_id: SESSION_ID,
+      watch_duration: p.watch_duration,
+      video_duration: dur,
+      completion_pct: dur > 0
+        ? Math.min(100, Math.round(((p.pos_ms > 0 ? p.pos_ms / 1000 : p.watch_duration) / dur) * 100))
+        : 0,
+    }).catch(() => {});
+  }, [video.id]);
 
   // Desmontou sem rolar (trocou de aba, fechou a tela): não perde o sinal
   useEffect(() => () => { enviarView(); }, [enviarView]);
@@ -367,8 +391,6 @@ export default function VideoCard({ video, index, cardHeight, activeOverride, ne
             shouldPlay={isActive}
             isMuted={muted}
             onLoad={handleVideoLoad}
-            onPlaybackStatusUpdate={handleStatus}
-            progressUpdateIntervalMillis={250}
           />
         ) : video.thumbnail_url ? (
           <Image source={{ uri: video.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />

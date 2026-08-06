@@ -102,8 +102,10 @@ export default function VideoScreen({ route, navigation }) {
   }, []);
 
   // index null vindo do FlashList zerava o ativo e travava TODOS os vídeos
-  // depois do primeiro (bug 06/08). O helper nunca troca por valor inválido.
-  const onViewableItemsChanged = useRef(criarHandlerAtivo(setActiveIdx)).current;
+  // depois do primeiro (bug 06/08). O helper nunca troca por valor inválido
+  // e sempre entrega NÚMERO pro setter (ver viewability.js).
+  const idxRef = useRef(startIndex);
+  const onViewableItemsChanged = useRef(criarHandlerAtivo(setActiveIdx, idxRef)).current;
 
   return (
     <View style={styles.root} onLayout={(e) => setListH(e.nativeEvent.layout.height)}>

@@ -139,8 +139,10 @@ export default function FeedScreen() {
     if (videos.length === 0) loadFeed(true);
   }, []);
 
-  // mesma proteção do VideoScreen: nunca deixa o ativo virar null/NaN
-  const onViewableItemsChanged = useRef(criarHandlerAtivo(setCurrentIndex)).current;
+  // setCurrentIndex é ação do ZUSTAND: recebe VALOR, não função. O helper
+  // guarda o índice corrente neste ref e entrega sempre um número.
+  const idxRef = useRef(0);
+  const onViewableItemsChanged = useRef(criarHandlerAtivo(setCurrentIndex, idxRef)).current;
 
   if (isLoading && videos.length === 0) {
     return (
