@@ -130,6 +130,16 @@ export default function VideoScreen({ route, navigation }) {
       ) : (
         <FlashList
           data={videos}
+          // ── FIM DO "não reproduz ao rolar" (fix 11/08) ───────────────────
+          // O card ativo aqui vem por PROP (activeOverride/nearActive),
+          // calculada a partir do estado local activeIdx. O FlashList recicla
+          // as células e NÃO as re-renderiza quando um valor externo muda —
+          // só quando `data` ou `extraData` mudam. Sem isto, ao rolar o
+          // activeIdx mudava mas os cards ficavam com a prop velha: o vídeo
+          // seguinte nunca recebia "você é o ativo" e não tocava. (O feed não
+          // sofre porque lá o VideoCard lê o índice direto do store e se
+          // re-renderiza sozinho.) extraData força o repaint dos cards visíveis.
+          extraData={activeIdx}
           keyExtractor={(item) => item.id}
           renderItem={({ item, index }) => {
             // slot inválido vira placeholder da MESMA altura (null quebrava o
