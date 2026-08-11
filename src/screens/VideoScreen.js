@@ -9,7 +9,7 @@
 //   cursor: (explore) continua a paginacao de onde o grid parou
 //   creator: (user) perfil dono dos videos — enriquece cards sem creator
 //   video_id: (single/deep-link) busca 1 video via API
-import { criarHandlerAtivo } from '../utils/viewability';
+import { criarHandlerAtivo, VIEW_CONFIG } from '../utils/viewability';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, useWindowDimensions } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
@@ -175,7 +175,7 @@ export default function VideoScreen({ route, navigation }) {
           onEndReached={loadMore}
           onEndReachedThreshold={2}
           onViewableItemsChanged={onViewableItemsChanged}
-          viewabilityConfig={{ itemVisiblePercentThreshold: 80, minimumViewTime: 100 }}
+          viewabilityConfig={VIEW_CONFIG}
         />
       )}
       <TouchableOpacity

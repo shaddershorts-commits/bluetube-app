@@ -27,6 +27,13 @@
 // Antes, cada evento de scroll disparava re-render mesmo sem mudança — e
 // re-render no feed remonta players.
 
+// Config de viewability COMPARTILHADA e estável (mesma referência sempre).
+// Objeto inline no JSX (`viewabilityConfig={{...}}`) muda de identidade a cada
+// render; o React Native reclama e pode instabilizar a detecção quando isso
+// acontece. Uma constante única garante que feed e VideoScreen usem exatamente
+// a mesma regra, sem esse risco.
+export const VIEW_CONFIG = { itemVisiblePercentThreshold: 80, minimumViewTime: 100 };
+
 export function escolherAtivo(viewableItems, atualFallback = 0) {
   if (!Array.isArray(viewableItems) || viewableItems.length === 0) {
     return atualFallback;

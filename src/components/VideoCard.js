@@ -265,7 +265,33 @@ export default function VideoCard({ video, index, cardHeight, activeOverride, ne
     if (ns && ns.width && ns.height) {
       setFitMode(pickResizeMode(ns.width, ns.height));
     }
+    // Auto-cura imediata: se este card já está ativo quando o vídeo termina de
+    // carregar, garante o play na hora. Cobre a corrida em que isActive virou
+    // true ANTES de o player existir — aí o efeito de play tinha desistido
+    // (videoRef ainda null) e só o shouldPlay do expo-av seguraria (nem sempre
+    // pega). Play num vídeo já tocando é inofensivo (no-op).
+    if (isActive) { videoRef.current?.playAsync?.().catch(() => {}); }
   };
+
+  // AUTO-CURA DA REPRODUÇÃO (11/08 — "pra não acontecer de novo", vale feed E
+  // explorar por estar no VideoCard). Garante que o vídeo ATIVO esteja MESMO
+  // tocando: uma única checagem ~700ms após ativar. Se estiver carregado e
+  // parado, dá play. Sem polling contínuo — a lição da ponte JS que já custou
+  // fluidez (onPlaybackStatusUpdate a cada 250ms) não se repete: é UMA leitura,
+  // só no card ativo, só uma vez por ativação. Se o usuário pausou no dedo,
+  // isActive já é false e isto nem roda (não briga com a pausa manual).
+  useEffect(() => {
+    if (!isActive) return undefined;
+    const t = setTimeout(async () => {
+      try {
+        const st = await videoRef.current?.getStatusAsync?.();
+        if (st?.isLoaded && !st.isPlaying) {
+          await videoRef.current?.playAsync?.();
+        }
+      } catch (_) { /* player desmontou no meio: ok */ }
+    }, 700);
+    return () => clearTimeout(t);
+  }, [isActive]);
 
   const flashHeart = () => {
     heartScale.setValue(0);

@@ -1,4 +1,4 @@
-import { criarHandlerAtivo } from '../utils/viewability';
+import { criarHandlerAtivo, VIEW_CONFIG } from '../utils/viewability';
 import { useEffect, useCallback, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Animated, useWindowDimensions, DeviceEventEmitter } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
@@ -184,7 +184,7 @@ export default function FeedScreen() {
         onRefresh={() => loadFeed(true)}
         refreshing={isLoading && videos.length > 0}
         onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={{ itemVisiblePercentThreshold: 80, minimumViewTime: 100 }}
+        viewabilityConfig={VIEW_CONFIG}
       />
       <View style={[styles.livesOverlay, { top: insets.top }]} pointerEvents="box-none">
         <LivesBar />
