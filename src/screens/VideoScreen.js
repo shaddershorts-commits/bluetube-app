@@ -116,6 +116,17 @@ export default function VideoScreen({ route, navigation }) {
           <Text style={styles.emptyIcon}>🎬</Text>
           <Text style={styles.emptyText}>{t('video_notfound')}</Text>
         </View>
+      ) : listH === 0 ? (
+        // ── FIM DO TRAVAMENTO AO ABRIR (fix 11/08) ───────────────────────
+        // Causa raiz: o FlashList montava com a altura ESTIMADA errada
+        // (winH, porque listH ainda era 0), pulava pro vídeo tocado via
+        // initialScrollIndex, e quando a altura REAL chegava pelo onLayout ele
+        // reposicionava a lista inteira — esse recálculo é o congelamento que
+        // só acontecia no explorar/perfil/salvos (o feed começa no 0, sem
+        // pulo, por isso não travava). Agora a lista só nasce DEPOIS de medir:
+        // um frame preto (o fundo do vídeo já é preto → não pisca) e o
+        // initialScrollIndex cai no lugar exato, sem reposicionar nada.
+        <View style={{ flex: 1, backgroundColor: '#000' }} />
       ) : (
         <FlashList
           data={videos}
@@ -140,6 +151,10 @@ export default function VideoScreen({ route, navigation }) {
             );
           }}
           estimatedItemSize={CARD_H}
+          // Todos os cards têm a MESMA altura (uma tela). Dizer isso explícito
+          // ao FlashList torna o offset do initialScrollIndex exato — sem
+          // depender de estimativa, o pulo cai no pixel certo.
+          overrideItemLayout={(layout) => { layout.size = CARD_H; }}
           snapToInterval={CARD_H}
           snapToAlignment="start"
           decelerationRate="fast"
