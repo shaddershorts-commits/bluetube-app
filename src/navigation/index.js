@@ -43,7 +43,7 @@ import StoryViewerScreen from '../screens/StoryViewerScreen';
 import CriarGrupoScreen from '../screens/CriarGrupoScreen';
 import FollowListScreen from '../screens/FollowListScreen';
 import CallScreen from '../screens/CallScreen';
-import { supabase } from '../lib/supabase';
+import { supabase, autenticarRealtime } from '../lib/supabase';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -234,20 +234,32 @@ function useIncomingCallRing(navigation) {
   const userId = useAuthStore((s) => s.user?.id);
   useEffect(() => {
     if (!userId) return;
-    const ch = supabase.channel(`ring-${userId}`);
-    ch.on('broadcast', { event: 'ring' }, ({ payload }) => {
-      if (!payload?.call_id) return;
-      try {
-        navigation.navigate('Call', {
-          mode: 'incoming',
-          callId: payload.call_id,
-          tipo: payload.tipo === 'video' ? 'video' : 'audio',
-          other: payload.caller || null,
-        });
-      } catch (e) {}
+    let vivo = true;
+    let ch = null;
+    // Manda o JWT antes de entrar no canal (auditoria 11/08): sem isso o
+    // Realtime só conhece a chave pública do APK e qualquer um entra no
+    // `ring-` de qualquer pessoa. Se falhar, entra assim mesmo — a campainha
+    // não pode parar de tocar por causa do SecureStore.
+    autenticarRealtime().finally(() => {
+      if (!vivo) return;
+      ch = supabase.channel(`ring-${userId}`);
+      ch.on('broadcast', { event: 'ring' }, ({ payload }) => {
+        if (!payload?.call_id) return;
+        try {
+          navigation.navigate('Call', {
+            mode: 'incoming',
+            callId: payload.call_id,
+            tipo: payload.tipo === 'video' ? 'video' : 'audio',
+            other: payload.caller || null,
+          });
+        } catch (e) {}
+      });
+      ch.subscribe();
     });
-    ch.subscribe();
-    return () => { try { supabase.removeChannel(ch); } catch (e) {} };
+    return () => {
+      vivo = false;
+      try { if (ch) supabase.removeChannel(ch); } catch (e) {}
+    };
   }, [userId, navigation]);
 }
 

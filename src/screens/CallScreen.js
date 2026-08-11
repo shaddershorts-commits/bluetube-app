@@ -24,7 +24,7 @@ import { useKeepAwake } from 'expo-keep-awake';
 import { Ionicons } from '@expo/vector-icons';
 import Avatar from '../components/Avatar';
 import blueAPI from '../api';
-import { supabase } from '../lib/supabase';
+import { supabase, autenticarRealtime } from '../lib/supabase';
 import { useAuthStore } from '../store';
 import { COLORS_DARK as COLORS } from '../constants';
 
@@ -163,7 +163,13 @@ export default function CallScreen({ route }) {
   };
 
   // ── canal de sinalização call-<id> ──────────────────────────────────────
-  const entrarNoCanal = useCallback((souCaller) => {
+  const entrarNoCanal = useCallback(async (souCaller) => {
+    // Identidade antes de entrar no canal de sinalização (auditoria 11/08).
+    // Sem o JWT, o Realtime só vê a chave pública do APK — e `call-<id>` tem
+    // nome previsível, então um terceiro poderia entrar e responder a oferta
+    // no lugar do destinatário. Falha aqui não cancela a chamada: a policy do
+    // servidor é quem barra de fato, isto é a metade do cliente.
+    try { await autenticarRealtime(); } catch (e) {}
     const ch = supabase.channel(`call-${callIdRef.current}`, {
       config: { broadcast: { self: false } },
     });
@@ -256,17 +262,11 @@ export default function CallScreen({ route }) {
       }
       montarPeer(stream);
       entrarNoCanal(true);
-      // toca no aparelho do outro se o app dele estiver ABERTO (push cobre fechado)
-      const ringCh = supabase.channel(`ring-${other.user_id}`);
-      ringCh.subscribe((st) => {
-        if (st === 'SUBSCRIBED') {
-          ringCh.send({
-            type: 'broadcast', event: 'ring',
-            payload: { call_id: r.call_id, tipo, caller: r.caller || { user_id: myId } },
-          });
-          setTimeout(() => { try { supabase.removeChannel(ringCh); } catch (e) {} }, 4000);
-        }
-      });
+      // O toque no aparelho do outro (app ABERTO) agora sai do SERVIDOR, junto
+      // com a criação da chamada em api/blue-calls.js. Antes saía daqui, e pra
+      // isso este aparelho precisava entrar no canal `ring-` do destinatário —
+      // o que obrigava aquele canal a ficar aberto pra todo mundo. App fechado
+      // segue coberto pelo push FCM.
       // '_DTMF_' (NÃO '_DEFAULT_'): no Android o incall-manager define
       // defaultRingbackUri = Settings.System.DEFAULT_RINGTONE_URI, ou seja,
       // '_DEFAULT_' toca o TOQUE DO APARELHO — quem liga ouvia o mesmo som de
