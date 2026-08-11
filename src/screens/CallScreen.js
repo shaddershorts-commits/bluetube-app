@@ -65,6 +65,8 @@ export default function CallScreen({ route }) {
   const [muted, setMuted] = useState(false);
   const [speakerOn, setSpeakerOn] = useState(isVideo); // vídeo = viva-voz por padrão
   const [camOff, setCamOff] = useState(false);
+  // a chamada abre na frontal (facingMode 'user'); flipCam alterna
+  const [usandoFrontal, setUsandoFrontal] = useState(true);
   const [secs, setSecs] = useState(0);
   const [localStreamUrl, setLocalStreamUrl] = useState(null);
   const [remoteStreamUrl, setRemoteStreamUrl] = useState(null);
@@ -361,8 +363,15 @@ export default function CallScreen({ route }) {
     setCamOff(off);
     try { localRef.current?.getVideoTracks().forEach((t) => { t.enabled = !off; }); } catch (e) {}
   };
+  // Espelho SÓ na frontal (fix 06/08): o preview local tinha `mirror` fixo,
+  // então a câmera traseira aparecia invertida — texto ao contrário, mão
+  // trocada. Espelhar é certo na frontal (é como o usuário se vê no espelho)
+  // e ERRADO na traseira, que mostra o mundo como ele é.
   const flipCam = () => {
-    try { localRef.current?.getVideoTracks().forEach((t) => t._switchCamera && t._switchCamera()); } catch (e) {}
+    try {
+      localRef.current?.getVideoTracks().forEach((t) => t._switchCamera && t._switchCamera());
+      setUsandoFrontal((v) => !v);
+    } catch (e) {}
   };
 
   useEffect(() => {
@@ -397,7 +406,7 @@ export default function CallScreen({ route }) {
       ) : null}
       {isVideo && localStreamUrl && !camOff ? (
         <View style={styles.pip}>
-          <RTCView streamURL={localStreamUrl} style={{ flex: 1 }} objectFit="cover" mirror zOrder={1} />
+          <RTCView streamURL={localStreamUrl} style={{ flex: 1 }} objectFit="cover" mirror={usandoFrontal} zOrder={1} />
         </View>
       ) : null}
 

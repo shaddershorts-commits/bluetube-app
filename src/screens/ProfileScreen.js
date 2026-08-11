@@ -291,6 +291,7 @@ export default function ProfileScreen() {
             <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.glassDark }]} pointerEvents="none" />
             <View style={styles.menuHandle} />
             <MenuItem icon="person-outline" label="Editar perfil" onPress={() => { setMenuOpen(false); nav.navigate('EditProfile'); }} />
+            <MenuItem icon="heart-outline" label="Sua atividade" onPress={() => { setMenuOpen(false); nav.navigate('Atividade'); }} />
             <MenuItem icon="bookmark-outline" label="Salvos" onPress={() => { setMenuOpen(false); nav.navigate('Saved'); }} />
             <MenuItem icon="notifications-outline" label="Notificações" onPress={() => { setMenuOpen(false); nav.navigate('Notifications'); }} />
             {/* Conta Pessoal = simples: sem insights nem monetização (Configurações → Tipo de conta) */}

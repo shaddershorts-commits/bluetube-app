@@ -23,7 +23,11 @@ import GlassMenu from '../components/GlassMenu';
 import ShareCard from '../components/ShareCard';
 import { COLORS } from '../constants';
 import { useChatTheme } from '../store/theme';
-import { wallpaperKey, getWallpaper, setWallpaper, removeWallpaper } from '../utils/wallpaper';
+import {
+  wallpaperKey, getWallpaper, setWallpaper, removeWallpaper,
+  getAjuste, setAjuste, AJUSTE_PADRAO,
+} from '../utils/wallpaper';
+import AjustarPapelParede from '../components/AjustarPapelParede';
 
 function fmtDur(s) {
   if (!s || !isFinite(s)) return '0:00';
@@ -50,15 +54,32 @@ function Ticks({ msg }) {
 }
 
 // Bolha de áudio com play/pause (expo-av)
+// Velocidades do áudio (pedido do dono 06/08). Ciclo 1x → 1,5x → 2x.
+// `shouldCorrectPitch: true` mantém a voz natural em vez de deixar aguda —
+// sem isso, 2x vira som de desenho animado.
+const VELOCIDADES = [1, 1.5, 2];
+
 function AudioBubble({ msg, mine }) {
   const [sound, setSound] = useState(null);
   const [playing, setPlaying] = useState(false);
   const [pos, setPos] = useState(0);
+  const [vel, setVel] = useState(1);
   useEffect(() => () => { sound?.unloadAsync?.(); }, [sound]);
+
+  const trocarVel = async () => {
+    const prox = VELOCIDADES[(VELOCIDADES.indexOf(vel) + 1) % VELOCIDADES.length];
+    setVel(prox);
+    // aplica na hora se já estiver tocando; senão vale no próximo play
+    try { await sound?.setRateAsync?.(prox, true); } catch (_) {}
+  };
+
   const toggle = async () => {
     try {
       if (!sound) {
-        const { sound: s } = await Audio.Sound.createAsync({ uri: msg.media_url }, { shouldPlay: true });
+        const { sound: s } = await Audio.Sound.createAsync(
+          { uri: msg.media_url },
+          { shouldPlay: true, rate: vel, shouldCorrectPitch: true },
+        );
         s.setOnPlaybackStatusUpdate((st) => {
           if (!st.isLoaded) return;
           setPos(Math.floor((st.positionMillis || 0) / 1000));
@@ -70,20 +91,32 @@ function AudioBubble({ msg, mine }) {
       } else if (playing) {
         await sound.pauseAsync();
       } else {
+        try { await sound.setRateAsync(vel, true); } catch (_) {}
         await sound.playAsync();
       }
     } catch (_) {}
   };
+
   return (
-    <TouchableOpacity style={styles.audioRow} onPress={toggle}>
-      <Ionicons name={playing ? 'pause-circle' : 'play-circle'} size={34} color={mine ? '#fff' : COLORS.neon} />
+    <View style={styles.audioRow}>
+      <TouchableOpacity onPress={toggle} hitSlop={6}>
+        <Ionicons name={playing ? 'pause-circle' : 'play-circle'} size={34} color={mine ? '#fff' : COLORS.neon} />
+      </TouchableOpacity>
       <View style={[styles.audioBar, !mine && { backgroundColor: COLORS.border }]}>
         <View style={[styles.audioFill, { width: msg.media_duration ? Math.min(100, (pos / msg.media_duration) * 100) + '%' : '0%', backgroundColor: mine ? '#fff' : COLORS.neon }]} />
       </View>
       <Text style={[styles.audioDur, mine && { color: 'rgba(255,255,255,0.8)' }]}>
         {fmtDur(playing ? pos : msg.media_duration)}
       </Text>
-    </TouchableOpacity>
+      <TouchableOpacity
+        onPress={trocarVel}
+        hitSlop={8}
+        style={[styles.velBtn, mine ? { backgroundColor: 'rgba(255,255,255,0.22)' } : { backgroundColor: COLORS.inputBg }]}>
+        <Text style={[styles.velTxt, mine && { color: '#fff' }]}>
+          {vel === 1 ? '1x' : vel === 1.5 ? '1,5x' : '2x'}
+        </Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -121,6 +154,8 @@ export default function ConversaScreen({ route }) {
   const [headerMenu, setHeaderMenu] = useState(false); // menu ⋮ do header
   const [wallMenu, setWallMenu] = useState(false);     // submenu papel de parede
   const [wallpaper, setWallpaperUri] = useState(null); // fundo da conversa (local)
+  const [wallAjuste, setWallAjuste] = useState(AJUSTE_PADRAO); // desfoque/zoom/posição
+  const [ajustando, setAjustando] = useState(false);   // tela de ajuste aberta
   const [editing, setEditing] = useState(null);       // mensagem em edição
   const [requestPend, setRequestPend] = useState(!!is_request); // banner Novos contatos
   const [meuRole, setMeuRole] = useState('membro');   // meu papel no grupo
@@ -255,6 +290,9 @@ export default function ConversaScreen({ route }) {
     getWallpaper(wallKey)
       .then((uri) => { if (!cancelled) setWallpaperUri(uri); })
       .catch(() => {});
+    getAjuste(wallKey)
+      .then((a) => { if (!cancelled) setWallAjuste(a); })
+      .catch(() => {});
     return () => { cancelled = true; };
   }, [wallKey]);
 
@@ -268,15 +306,27 @@ export default function ConversaScreen({ route }) {
       if (res.canceled || !res.assets?.length) return;
       const uri = await setWallpaper(wallKey, res.assets[0].uri);
       setWallpaperUri(uri);
+      // Foto nova começa do zero e cai direto no ajuste: o dono pediu que
+      // "quando adicionar vai pra opções pra ajustar se ele quiser".
+      setWallAjuste({ ...AJUSTE_PADRAO });
+      await setAjuste(wallKey, AJUSTE_PADRAO);
+      if (uri) setAjustando(true);
     } catch (e) {
       Alert.alert('Erro', e.message || 'Não deu pra definir o papel de parede.');
     }
+  };
+
+  const salvarAjuste = async (novo) => {
+    setWallAjuste(novo);       // aplica na hora, mesmo se a gravação falhar
+    setAjustando(false);
+    try { await setAjuste(wallKey, novo); } catch (e) {}
   };
 
   const tirarPapelParede = async () => {
     try {
       await removeWallpaper(wallKey);
       setWallpaperUri(null);
+      setWallAjuste({ ...AJUSTE_PADRAO });
     } catch (e) {}
   };
 
@@ -412,13 +462,27 @@ export default function ConversaScreen({ route }) {
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[styles.container, ov.container]}>
-      {/* Papel de parede: desfoque LEVE (blurRadius do próprio <Image>, que é
-          nativo nos dois sistemas) + véu escuro sutil, só o suficiente pras
-          bolhas continuarem legíveis por cima de qualquer foto. */}
+      {/* Papel de parede: desfoque, véu, zoom e posição vêm do ajuste que o
+          dono da conversa salvou (utils/wallpaper). blurRadius do próprio
+          <Image> é nativo nos dois sistemas — nada de biblioteca extra. */}
       {wallpaper ? (
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
-          <Image source={{ uri: wallpaper }} style={StyleSheet.absoluteFill} resizeMode="cover" blurRadius={6} />
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.28)' }]} />
+          <Image
+            source={{ uri: wallpaper }}
+            style={[
+              StyleSheet.absoluteFill,
+              {
+                transform: [
+                  { translateX: wallAjuste.x },
+                  { translateY: wallAjuste.y },
+                  { scale: wallAjuste.zoom },
+                ],
+              },
+            ]}
+            resizeMode="cover"
+            blurRadius={wallAjuste.blur}
+          />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: `rgba(0,0,0,${wallAjuste.escuro})` }]} />
         </View>
       ) : null}
 
@@ -574,10 +638,23 @@ export default function ConversaScreen({ route }) {
         subtitle="Vale só pra você, neste aparelho"
         options={[
           { icon: 'images-outline', label: 'Escolher da galeria', onPress: escolherPapelParede },
+          wallpaper ? { icon: 'options-outline', label: 'Ajustar (zoom, posição, desfoque)', onPress: () => setAjustando(true) } : null,
           wallpaper ? { icon: 'trash-outline', label: 'Remover papel de parede', danger: true, onPress: tirarPapelParede } : null,
         ]}
         onClose={() => setWallMenu(false)}
       />
+
+      {/* Ajuste da foto de fundo — abre sozinho ao escolher e fica disponível
+          depois no menu, pra mexer quando quiser. */}
+      {wallpaper && ajustando ? (
+        <AjustarPapelParede
+          visible
+          uri={wallpaper}
+          inicial={wallAjuste}
+          onCancelar={() => setAjustando(false)}
+          onSalvar={salvarAjuste}
+        />
+      ) : null}
     </KeyboardAvoidingView>
   );
 }
@@ -611,6 +688,8 @@ const styles = StyleSheet.create({
   audioBar: { flex: 1, height: 3, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.25)', overflow: 'hidden' },
   audioFill: { height: '100%' },
   audioDur: { color: COLORS.textSecondary, fontSize: 11 },
+  velBtn: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 100, minWidth: 34, alignItems: 'center' },
+  velTxt: { color: COLORS.textSecondary, fontSize: 10.5, fontWeight: '800' },
   gravBar: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: 'rgba(239,68,68,0.08)' },
   gravText: { color: '#ef4444', fontSize: 13, fontWeight: '700' },
   gravHint: { color: COLORS.textDim, fontSize: 11, marginLeft: 'auto' },

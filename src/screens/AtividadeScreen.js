@@ -50,6 +50,35 @@ export default function AtividadeScreen() {
   const cardW = (W - GAP * 4) / 3;
   const cardH = cardW * (16 / 9);
 
+  // Agrupa por MÊS/ANO (pedido do dono 06/08). Usa `curtido_em` quando o
+  // backend manda; senão cai pra data do vídeo. Sem nenhuma das duas, entra
+  // em "Antes" — melhor um balde honesto que sumir da lista.
+  const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+    'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+  const agora = new Date();
+  const grupos = [];
+  const porChave = {};
+  for (const v of videos) {
+    const bruto = v.curtido_em || v.liked_at || v.created_at;
+    const d = bruto ? new Date(bruto) : null;
+    const valida = d && !isNaN(d.getTime());
+    const chave = valida ? `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}` : 'antes';
+    if (!porChave[chave]) {
+      const mesmoAno = valida && d.getFullYear() === agora.getFullYear();
+      porChave[chave] = {
+        chave,
+        titulo: valida
+          ? (mesmoAno ? MESES[d.getMonth()] : `${MESES[d.getMonth()]} de ${d.getFullYear()}`)
+          : 'Antes',
+        ordem: valida ? d.getTime() : 0,
+        itens: [],
+      };
+      grupos.push(porChave[chave]);
+    }
+    porChave[chave].itens.push(v);
+  }
+  grupos.sort((a, b) => b.ordem - a.ordem); // mais recente primeiro
+
   return (
     <View style={{ flex: 1, backgroundColor: COLORS.background }}>
       <Header title="Sua atividade" showBack />
@@ -64,27 +93,32 @@ export default function AtividadeScreen() {
             <Text style={styles.emptyHint}>Os vídeos que você curtir no feed aparecem aqui</Text>
           </View>
         ) : (
-          <View style={[styles.grid, { padding: GAP, gap: GAP }]}>
-            {videos.map((v) => (
-              <TouchableOpacity
-                key={v.id}
-                onPress={() => nav.navigate('Video', { videos, startIndex: videos.indexOf(v), mode: 'list' })}
-                activeOpacity={0.8}
-                style={[styles.card, { width: cardW, height: cardH }]}>
-                {v.thumbnail_url ? (
-                  <Image source={{ uri: v.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-                ) : (
-                  <View style={[StyleSheet.absoluteFill, styles.fallback]}>
-                    <Ionicons name="play" size={28} color="rgba(255,255,255,0.4)" />
-                  </View>
-                )}
-                <View style={styles.likeBadge}>
-                  <Ionicons name="heart" size={10} color="#fff" />
-                  <Text style={styles.likeText}>{formatCount(v.likes || 0)}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
+          grupos.map((g) => (
+            <View key={g.chave}>
+              <Text style={styles.mesTitulo}>{g.titulo}</Text>
+              <View style={[styles.grid, { padding: GAP, gap: GAP }]}>
+                {g.itens.map((v) => (
+                  <TouchableOpacity
+                    key={v.id}
+                    onPress={() => nav.navigate('Video', { videos, startIndex: videos.indexOf(v), mode: 'list' })}
+                    activeOpacity={0.8}
+                    style={[styles.card, { width: cardW, height: cardH }]}>
+                    {v.thumbnail_url ? (
+                      <Image source={{ uri: v.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                    ) : (
+                      <View style={[StyleSheet.absoluteFill, styles.fallback]}>
+                        <Ionicons name="play" size={28} color="rgba(255,255,255,0.4)" />
+                      </View>
+                    )}
+                    <View style={styles.likeBadge}>
+                      <Ionicons name="heart" size={10} color="#fff" />
+                      <Text style={styles.likeText}>{formatCount(v.likes || 0)}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          ))
         )}
       </ScrollView>
     </View>
@@ -92,6 +126,11 @@ export default function AtividadeScreen() {
 }
 
 const styles = StyleSheet.create({
+  mesTitulo: {
+    color: COLORS.text, fontSize: 13.5, fontWeight: '800',
+    paddingHorizontal: 14, paddingTop: 16, paddingBottom: 6,
+    textTransform: 'capitalize',
+  },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   sub: { color: COLORS.textSecondary, fontSize: 12, paddingHorizontal: 12, paddingTop: 10, paddingBottom: 4 },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },

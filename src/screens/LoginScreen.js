@@ -181,7 +181,7 @@ export default function LoginScreen({ navigation, route }) {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.container}>
         <View style={styles.logoWrap}>
           <LogoBlueTube width={220} height={110} variant="stacked" />
-          <Text style={styles.sub}>{reasonMsg || 'A nova rede social de vídeos curtos'}</Text>
+          <Text style={styles.sub}>{reasonMsg || 'Vídeos curtos e chat'}</Text>
         </View>
 
         <View style={styles.tabs}>

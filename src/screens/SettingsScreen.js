@@ -393,10 +393,15 @@ const styles = StyleSheet.create({
   label: { color: COLORS.text, fontSize: 14, fontWeight: '500' },
   value: { color: COLORS.textSecondary, fontSize: 12, marginTop: 2 },
   platform: { color: COLORS.textDim, fontSize: 11, textAlign: 'center', marginTop: 24 },
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: 28 },
+  modalBackdrop: { flex: 1, backgroundColor: COLORS.overlay, alignItems: 'center', justifyContent: 'center', padding: 28 },
+  // FIX 06/08 (idioma ilegível no tema claro): o card tinha fundo '#0a1020'
+  // CRAVADO enquanto o título usava COLORS.text — que no tema claro é quase
+  // preto. Texto escuro sobre card escuro. Mesma classe de bug já corrigida no
+  // GlassMenu e no menu do perfil: superfície e texto têm que sair do mesmo
+  // conjunto de tokens, senão um segue o tema e o outro não.
   modalCard: {
-    width: '100%', backgroundColor: '#0a1020', borderRadius: 18, padding: 18,
-    borderWidth: 1, borderColor: 'rgba(0,170,255,0.2)',
+    width: '100%', backgroundColor: COLORS.surface, borderRadius: 18, padding: 18,
+    borderWidth: 1, borderColor: COLORS.border,
   },
   modalTitle: { color: COLORS.text, fontSize: 16, fontWeight: '800', marginBottom: 12, textAlign: 'center' },
   pwdHint: { color: COLORS.textSecondary, fontSize: 13, lineHeight: 19, marginBottom: 12, textAlign: 'center' },

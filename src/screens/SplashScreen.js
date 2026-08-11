@@ -103,7 +103,7 @@ export default function SplashScreen({ onFinish }) {
       <Animated.Text
         style={[styles.tagline, { opacity: taglineOpacity, transform: [{ translateY: taglineY }] }]}
       >
-        A nova rede social de vídeos curtos
+        Vídeos curtos e chat
       </Animated.Text>
     </LinearGradient>
   );
