@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import Avatar from '../components/Avatar';
 import blueAPI from '../api';
 import { useAuthStore } from '../store';
@@ -45,6 +46,7 @@ export default function ProfileScreen() {
   const { width: W } = useWindowDimensions();
   const { logout } = useAuthStore();
   const [profile, setProfile] = useState(null);
+  const [temStory, setTemStory] = useState(false); // anel azul de storie ativo
   const [videos, setVideos] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -55,14 +57,19 @@ export default function ProfileScreen() {
 
   const load = useCallback(async () => {
     try {
-      const [pr, vr, sr] = await Promise.all([
+      const [pr, vr, sr, st] = await Promise.all([
         blueAPI.meuPerfil().catch(() => null),
         blueAPI.meusVideos().catch(() => null),
         blueAPI.monetizacaoStatus().catch(() => null),
+        blueAPI.storiesMeus().catch(() => null),
       ]);
       setProfile((pr && (pr.profile || pr)) || null);
       setVideos((vr && vr.videos) || []);
       setStats(sr || null);
+      // Anel azul: tenho story ativo (não expirado)?
+      const meusStories = (st && (st.stories || st.meus)) || [];
+      const agora = Date.now();
+      setTemStory(meusStories.some((s) => !s.expirado_em || new Date(s.expirado_em).getTime() > agora));
     } catch {}
     setLoading(false);
     setRefreshing(false);
@@ -131,15 +138,15 @@ export default function ProfileScreen() {
       if (res.canceled || !res.assets?.length) return;
       const asset = res.assets[0];
       const isVideo = asset.type === 'video';
-      const r = await blueAPI.storyCriar(asset.uri, {
+      // Abre o EDITOR estilo Instagram (texto/figurinha/menção/desenho/filtro +
+      // audiência) ANTES de publicar — não posta mais direto (pedido do dono).
+      nav.navigate('StoryEditor', {
+        uri: asset.uri,
         tipo: isVideo ? 'video' : 'imagem',
-        duracao: isVideo ? Math.min(180, Math.round((asset.duration || 15000) / 1000)) : 5,
         mime: isVideo ? 'video/mp4' : 'image/jpeg',
       });
-      if (r?.ok || r?.story) Alert.alert('✓ Story publicado!', 'Ele fica no ar por 24 horas.');
-      else Alert.alert('Erro', r?.error || 'Não deu pra publicar o story. Tenta de novo.');
     } catch (e) {
-      Alert.alert('Erro', e.message || 'Não deu pra publicar o story.');
+      Alert.alert('Erro', e.message || 'Não deu pra abrir o editor de story.');
     }
   };
 
@@ -212,7 +219,18 @@ export default function ProfileScreen() {
         {/* Header estilo TikTok: avatar + stats inline */}
         <View style={styles.header}>
           <View>
-            <Avatar uri={profile?.avatar_url} initial={profile?.display_name || profile?.username} size={96} />
+            {temStory ? (
+              // Anel degradê azul = tem storie ativo. Tocar abre o próprio storie.
+              <TouchableOpacity activeOpacity={0.9} onPress={() => profile?.user_id && nav.navigate('StoryViewer', { user_id: profile.user_id })}>
+                <LinearGradient colors={['#3b82f6', '#8b5cf6', '#ec4899']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.storyRingGrad}>
+                  <View style={styles.storyRingInner}>
+                    <Avatar uri={profile?.avatar_url} initial={profile?.display_name || profile?.username} size={84} />
+                  </View>
+                </LinearGradient>
+              </TouchableOpacity>
+            ) : (
+              <Avatar uri={profile?.avatar_url} initial={profile?.display_name || profile?.username} size={96} />
+            )}
             {/* "+" azul = criar story de 24h (estilo Instagram/TikTok) */}
             <TouchableOpacity style={styles.storyPlus} onPress={criarStory} hitSlop={8} activeOpacity={0.8}>
               <Ionicons name="add" size={18} color="#fff" />
@@ -369,6 +387,8 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.neon, alignItems: 'center', justifyContent: 'center',
     borderWidth: 2.5, borderColor: COLORS.background,
   },
+  storyRingGrad: { width: 96, height: 96, borderRadius: 48, alignItems: 'center', justifyContent: 'center' },
+  storyRingInner: { width: 90, height: 90, borderRadius: 45, backgroundColor: COLORS.background, alignItems: 'center', justifyContent: 'center' },
   linkRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8, maxWidth: '85%' },
   linkText: { color: COLORS.neon, fontSize: 13, fontWeight: '600' },
   container: { flex: 1, backgroundColor: COLORS.background },

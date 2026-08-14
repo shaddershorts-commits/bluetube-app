@@ -227,6 +227,12 @@ export const blueAPI = {
     explore: (cursor) => api(`blue-feed?limit=24&min_views=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`),
     // Busca de perfis/hashtags/vídeos (barra do Descobrir)
     busca: (q) => api(`blue-feed?action=busca&q=${encodeURIComponent(q || '')}`),
+    // Busca de usuários (pra menção @ no editor de story). Reusa o 'busca' do
+    // feed, que já devolve `usuarios` de blue_profiles.
+    buscarUsuarios: async (q) => {
+          const d = await api(`blue-feed?action=busca&q=${encodeURIComponent(q || '')}`);
+          return { users: (d && d.usuarios) || [] };
+    },
     livesAtivas: () => api('blue-lives?action=lives-ativas'),
     stats: () => api('blue-feed?action=stats'),
 
@@ -501,7 +507,7 @@ export const blueAPI = {
     //      batia com policy por dono.
     // Agora usa o MESMO caminho ja provado do upload de video/midia do chat:
     // token do usuario + bucket blue-videos + prefixo `<sub do JWT>/`.
-    storyCriar: async (mediaUri, { tipo = 'imagem', duracao, mime, audience } = {}) => {
+    storyCriar: async (mediaUri, { tipo = 'imagem', duracao, mime, audience, overlays, filtro, legenda, som_off } = {}) => {
           const token = await getToken();
           if (!token) return { error: 'Login necessario' };
           try {
@@ -527,7 +533,17 @@ export const blueAPI = {
                 const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/blue-videos/${pathStorage}`;
                 return api('blue-stories', {
                       method: 'POST',
-                      body: JSON.stringify({ action: 'criar', token, tipo, media_url: publicUrl, duracao: duracao || (tipo === 'video' ? 15 : 5), audience: audience || 'stories' }),
+                      body: JSON.stringify({
+                            action: 'criar', token, tipo, media_url: publicUrl,
+                            duracao: duracao || (tipo === 'video' ? 15 : 5),
+                            audience: audience || 'stories',
+                            // Camadas do editor (texto/figurinha/menção/desenho), filtro de cor,
+                            // legenda (vira uma camada de texto no rodapé) e mudo do vídeo.
+                            overlays: Array.isArray(overlays) ? overlays : [],
+                            filtro: filtro || null,
+                            texto: legenda || null,
+                            som_off: !!som_off,
+                      }),
                 });
           } catch (e) {
                 return { error: e.message || 'Falha ao criar story' };

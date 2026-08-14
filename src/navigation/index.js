@@ -27,6 +27,7 @@ import ConversaScreen from '../screens/ConversaScreen';
 import GrupoInfoScreen from '../screens/GrupoInfoScreen';
 import TemasScreen from '../screens/TemasScreen';
 import AtividadeScreen from '../screens/AtividadeScreen';
+import StoryEditorScreen from '../screens/StoryEditorScreen';
 import PerfilUsuarioScreen from '../screens/PerfilUsuarioScreen';
 import ComentariosScreen from '../screens/ComentariosScreen';
 import LiveScreen from '../screens/LiveScreen';
@@ -314,6 +315,7 @@ export default function Navigation() {
                        <Stack.Screen name="GrupoInfo" component={GrupoInfoScreen} />
                        <Stack.Screen name="Temas" component={TemasScreen} />
                        <Stack.Screen name="Atividade" component={AtividadeScreen} />
+                       <Stack.Screen name="StoryEditor" component={StoryEditorScreen} />
                        <Stack.Screen name="PerfilUsuario" component={PerfilUsuarioScreen} />
                        <Stack.Screen name="Comentarios" component={ComentariosScreen} />
                        <Stack.Screen name="Live" component={LiveScreen} />

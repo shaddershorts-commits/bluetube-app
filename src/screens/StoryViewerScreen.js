@@ -7,9 +7,51 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Image, TextInput, Animated,
   KeyboardAvoidingView, Platform, PanResponder, ActivityIndicator, Alert,
-  Modal, Pressable, FlatList,
+  Modal, Pressable, FlatList, useWindowDimensions,
 } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
+import Svg, { Polyline } from 'react-native-svg';
+
+// Mesmas cores de filtro do editor (StoryEditorScreen) — reaplica por cima.
+const FILTRO_COR = {
+  quente: 'rgba(255,150,40,0.20)', frio: 'rgba(50,130,255,0.20)',
+  vintage: 'rgba(120,80,30,0.26)', rosa: 'rgba(255,90,150,0.20)',
+  desbotado: 'rgba(255,255,255,0.16)', noite: 'rgba(10,20,60,0.34)',
+};
+
+// Desenha as camadas do editor (texto/figurinha/menção/desenho) + filtro por
+// cima da mídia. box-none: espaço vazio deixa o toque passar pras zonas de
+// avançar/voltar; só a menção captura (abre o perfil).
+function StoryOverlays({ story, W, H, navigation }) {
+  const ov = Array.isArray(story?.overlays) ? story.overlays : [];
+  const cor = story?.filtro ? FILTRO_COR[story.filtro] : null;
+  const desenhos = ov.filter((o) => o && o.tipo === 'desenho');
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+      {cor ? <View style={[StyleSheet.absoluteFill, { backgroundColor: cor }]} pointerEvents="none" /> : null}
+      {desenhos.length ? (
+        <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+          {desenhos.map((o, i) => (
+            <Polyline key={'d' + i} points={(o.pontos || []).map(([x, y]) => `${x * W},${y * H}`).join(' ')}
+              fill="none" stroke={o.cor_traco || '#fff'} strokeWidth={o.largura || 4} strokeLinecap="round" strokeLinejoin="round" />
+          ))}
+        </Svg>
+      ) : null}
+      {ov.filter((o) => o && o.tipo !== 'desenho').map((o, i) => {
+        const pos = { position: 'absolute', left: (o.x ?? 0.5) * W, top: (o.y ?? 0.45) * H };
+        if (o.tipo === 'texto') return <Text key={i} pointerEvents="none" style={[pos, { color: o.cor || '#fff', fontSize: o.tamanho || 30, fontWeight: '800', textShadowColor: 'rgba(0,0,0,0.35)', textShadowRadius: 6 }]}>{o.texto}</Text>;
+        if (o.tipo === 'sticker') return <Text key={i} pointerEvents="none" style={[pos, { fontSize: 56 }]}>{o.emoji}</Text>;
+        if (o.tipo === 'mencao') return (
+          <TouchableOpacity key={i} style={[pos, { backgroundColor: 'rgba(0,0,0,0.35)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 }]}
+            onPress={() => o.user_id && navigation.navigate('PerfilUsuario', { user_id: o.user_id })}>
+            <Text style={{ color: '#fff', fontSize: 22, fontWeight: '800' }}>@{o.username}</Text>
+          </TouchableOpacity>
+        );
+        return null;
+      })}
+    </View>
+  );
+}
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -27,6 +69,7 @@ export default function StoryViewerScreen({ route, navigation }) {
   const me = useAuthStore((s) => s.user);
   const t = useT();
   const insets = useSafeAreaInsets();
+  const { width: W, height: H } = useWindowDimensions();
   const [users, setUsers] = useState(Array.isArray(usersParam) ? usersParam : []);
   const [userIdx, setUserIdx] = useState(startUserIndex);
   const [storyIdx, setStoryIdx] = useState(0);
@@ -209,6 +252,9 @@ export default function StoryViewerScreen({ route, navigation }) {
             onPress={goNext} onLongPress={() => setPaused(true)} onPressOut={() => paused && setPaused(false)} delayLongPress={200} />
         </View>
       </View>
+
+      {/* Camadas do editor (texto/figurinha/menção/desenho) + filtro de cor */}
+      <StoryOverlays story={story} W={W} H={H} navigation={navigation} />
 
       {/* Barras de progresso */}
       <View style={[styles.barsRow, { top: insets.top + 8 }]} pointerEvents="none">
