@@ -118,17 +118,15 @@ export default function CameraScreen() {
   // Regra correta: aqui é storie público (audience 'stories'); Status do chat
   // só é publicado pelo botão da aba Status, DENTRO do chat.
   const publicarStorie = async (uri, tipo, mime) => {
-    setPublicando(true);
-    const r = await blueAPI.storyCriar(uri, {
-      tipo, mime, audience: 'stories',
-      duracao: tipo === 'video' ? 15 : 5,
-    }).catch((e) => ({ error: e.message }));
-    setPublicando(false);
-    if (r?.error) { Alert.alert('Não deu pra postar', r.error); return; }
+    // Abre o EDITOR estilo Instagram (texto/figurinha/enquete/filtro + audiência)
+    // ANTES de publicar — mesmo fluxo do "+" do perfil. Não posta mais direto.
+    // Público por padrão; Status (Amigos Próximos) só se o usuário escolher lá.
     setPreview(null);
     setEscolha(null);
-    Alert.alert('✨ Storie publicado!', 'Ele aparece no seu perfil por 24 horas pra quem te segue.');
-    nav.navigate('Feed');
+    nav.navigate('StoryEditor', {
+      uri, tipo,
+      mime: mime || (tipo === 'video' ? 'video/mp4' : 'image/jpeg'),
+    });
   };
 
   const publicarPreview = () => {

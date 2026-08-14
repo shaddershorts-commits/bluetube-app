@@ -481,6 +481,15 @@ export const blueAPI = {
           const token = await getToken();
           return api(`blue-stories?action=ver&story_id=${encodeURIComponent(story_id)}&token=${encodeURIComponent(token)}`);
     },
+    // Enquete: vota (0|1) numa camada de enquete do story; devolve contagem.
+    votarEnquete: async (story_id, overlay_id, opcao) => {
+          const token = await getToken();
+          return api('blue-stories', { method: 'POST', body: JSON.stringify({ action: 'votar-enquete', token, story_id, overlay_id, opcao }) });
+    },
+    enqueteResultado: async (overlay_id) => {
+          const token = await getToken();
+          return api(`blue-stories?action=enquete-resultado&overlay_id=${encodeURIComponent(overlay_id)}&token=${encodeURIComponent(token || '')}`);
+    },
     storyReagir: async (story_id, emoji) => {
           const token = await getToken();
           return api('blue-stories', { method: 'POST', body: JSON.stringify({ action: 'reagir', token, story_id, emoji }) });

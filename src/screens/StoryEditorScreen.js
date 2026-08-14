@@ -38,6 +38,16 @@ const CORES_TEXTO = ['#ffffff', '#000000', '#3b82f6', '#ef4444', '#22c55e', '#f5
 const TAMANHOS = [22, 30, 40, 54];
 const EMOJIS = ['😂','🥰','😍','🔥','❤️','👍','😎','🥺','😭','🎉','✨','💯','🙌','😅','🤣','😊','💪','🤝','🚀','👀','🫶','😏','🥳','😮','🤔','👏','💥','⭐','🌈','☀️'];
 
+// Tempo restante de uma contagem regressiva (usado no editor e no viewer).
+function fmtRestante(alvoISO) {
+  const ms = new Date(alvoISO).getTime() - Date.now();
+  if (isNaN(ms) || ms <= 0) return '00:00';
+  const d = Math.floor(ms / 86400000);
+  const h = Math.floor((ms % 86400000) / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  return d > 0 ? `${d}d ${h}h` : `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
 // Camada arrastável genérica (texto/emoji/menção). Cada uma cuida do próprio
 // arraste via PanResponder + Animated (não re-renderiza a lista a cada frame).
 function Camada({ layer, W, H, selecionada, onSelecionar, onMover, onApagar, children }) {
@@ -98,6 +108,9 @@ export default function StoryEditorScreen() {
   const tracoRef = useRef([]);            // pontos do traço atual (px)
   const [tracoAtual, setTracoAtual] = useState([]);
   const [corTraco, setCorTraco] = useState('#ffffff');
+  // Figurinhas interativas (Fase 2): modal de criação + formulário
+  const [stkModal, setStkModal] = useState(null); // 'enquete'|'link'|'hashtag'|'contagem'
+  const [form, setForm] = useState({});
 
   const novoId = () => 'ov_' + Date.now() + '_' + Math.round(Math.random() * 1e4);
 
@@ -138,6 +151,45 @@ export default function StoryEditorScreen() {
     addOverlay({ tipo: 'mencao', username: u.username || u.display_name, user_id: u.user_id });
     setPainel(null); setMencaoQ(''); setMencaoRes([]);
   };
+
+  // ── FIGURINHAS INTERATIVAS (Fase 2) ──────────────────────────────────────
+  const abrirStk = (tipo) => {
+    setPainel(null);
+    if (tipo === 'enquete') setForm({ pergunta: '', a: 'Sim', b: 'Não' });
+    else if (tipo === 'link') setForm({ url: '', rotulo: '' });
+    else if (tipo === 'hashtag') setForm({ tag: '' });
+    else if (tipo === 'contagem') setForm({ titulo: '', dias: '1', horas: '0' });
+    setStkModal(tipo);
+  };
+  const salvarStk = () => {
+    if (stkModal === 'enquete') {
+      if (!form.pergunta?.trim()) { setStkModal(null); return; }
+      addOverlay({ tipo: 'enquete', pergunta: form.pergunta.trim(), opcoes: [(form.a || 'Sim').trim(), (form.b || 'Não').trim()] });
+    } else if (stkModal === 'link') {
+      let url = (form.url || '').trim();
+      if (!url) { setStkModal(null); return; }
+      if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+      addOverlay({ tipo: 'link', url, rotulo: (form.rotulo || '').trim() || url.replace(/^https?:\/\//, '') });
+    } else if (stkModal === 'hashtag') {
+      const tag = (form.tag || '').trim().replace(/^#/, '');
+      if (!tag) { setStkModal(null); return; }
+      addOverlay({ tipo: 'hashtag', tag });
+    } else if (stkModal === 'contagem') {
+      const dias = parseInt(form.dias) || 0, horas = parseInt(form.horas) || 0;
+      const alvo = new Date(Date.now() + (dias * 24 + horas) * 3600 * 1000).toISOString();
+      addOverlay({ tipo: 'contagem', titulo: (form.titulo || '').trim() || 'Contagem', alvo });
+    }
+    setStkModal(null); setForm({});
+  };
+  // itens do painel Figurinhas (tray estilo Instagram)
+  const STK = [
+    { key: 'enquete', icon: 'stats-chart', label: 'Enquete', on: () => abrirStk('enquete') },
+    { key: 'link', icon: 'link', label: 'Link', on: () => abrirStk('link') },
+    { key: 'hashtag', icon: 'pricetag', label: '#hashtag', on: () => abrirStk('hashtag') },
+    { key: 'contagem', icon: 'timer-outline', label: 'Contagem', on: () => abrirStk('contagem') },
+    { key: 'mencao2', icon: 'at', label: 'Mencionar', on: () => { setPainel('mencao'); } },
+    { key: 'gif', icon: 'images-outline', label: 'GIF (em breve)', on: () => Alert.alert('GIF', 'Os GIFs chegam no próximo build do app (precisa do módulo nativo). Já estou preparando.') },
+  ];
 
   // ── DESENHO ──────────────────────────────────────────────────────────────
   const desenhoPan = useRef(PanResponder.create({
@@ -232,6 +284,20 @@ export default function StoryEditorScreen() {
             <Text style={{ fontSize: 56 }}>{o.emoji}</Text>
           ) : o.tipo === 'mencao' ? (
             <View style={styles.mencaoChip}><Text style={styles.mencaoTxt}>@{o.username}</Text></View>
+          ) : o.tipo === 'enquete' ? (
+            <View style={styles.enqBox}>
+              <Text style={styles.enqPerg}>{o.pergunta}</Text>
+              <View style={styles.enqOpts}>
+                <View style={styles.enqOpt}><Text style={styles.enqOptTxt}>{o.opcoes[0]}</Text></View>
+                <View style={styles.enqOpt}><Text style={styles.enqOptTxt}>{o.opcoes[1]}</Text></View>
+              </View>
+            </View>
+          ) : o.tipo === 'link' ? (
+            <View style={styles.linkChip}><Ionicons name="link" size={14} color="#fff" /><Text style={styles.linkTxt}>{o.rotulo}</Text></View>
+          ) : o.tipo === 'hashtag' ? (
+            <View style={styles.mencaoChip}><Text style={styles.mencaoTxt}>#{o.tag}</Text></View>
+          ) : o.tipo === 'contagem' ? (
+            <View style={styles.enqBox}><Text style={styles.enqPerg}>{o.titulo}</Text><Text style={styles.contTimer}>{fmtRestante(o.alvo)}</Text></View>
           ) : null}
         </Camada>
       ))}
@@ -267,15 +333,23 @@ export default function StoryEditorScreen() {
 
       {/* PAINEL Figurinhas (emoji) */}
       {painel === 'figurinhas' ? (
-        <View style={[styles.painel, { bottom: insets.bottom + 90 }]}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 10, gap: 4 }}>
+        <View style={[styles.painelFig, { bottom: insets.bottom + 80, maxHeight: H * 0.5 }]}>
+          <View style={styles.figGrid}>
+            {STK.map((s) => (
+              <TouchableOpacity key={s.key} style={styles.figBtn} onPress={s.on}>
+                <Ionicons name={s.icon} size={18} color="#0a0a0a" />
+                <Text style={styles.figBtnTxt}>{s.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Text style={styles.figSec}>Emojis</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 6, gap: 2 }}>
             {EMOJIS.map((e) => (
               <TouchableOpacity key={e} onPress={() => { addOverlay({ tipo: 'sticker', emoji: e }); setPainel(null); }} style={styles.emojiBtn}>
                 <Text style={{ fontSize: 30 }}>{e}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
-          <Text style={styles.painelHint}>Figurinhas em GIF chegam em breve</Text>
         </View>
       ) : null}
 
@@ -332,6 +406,46 @@ export default function StoryEditorScreen() {
         </View>
       ) : null}
 
+      {/* MODAL figurinha interativa (enquete / link / hashtag / contagem) */}
+      <Modal visible={!!stkModal} transparent animationType="fade" onRequestClose={() => setStkModal(null)}>
+        <View style={styles.stkModalWrap}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setStkModal(null)} />
+          <View style={styles.stkCard}>
+            {stkModal === 'enquete' ? (
+              <>
+                <Text style={styles.stkTitle}>Enquete</Text>
+                <TextInput style={styles.stkInput} placeholder="Pergunta" placeholderTextColor="#888" value={form.pergunta} onChangeText={(t) => setForm((s) => ({ ...s, pergunta: t }))} autoFocus />
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <TextInput style={[styles.stkInput, { flex: 1 }]} placeholder="Opção 1" placeholderTextColor="#888" value={form.a} onChangeText={(t) => setForm((s) => ({ ...s, a: t }))} />
+                  <TextInput style={[styles.stkInput, { flex: 1 }]} placeholder="Opção 2" placeholderTextColor="#888" value={form.b} onChangeText={(t) => setForm((s) => ({ ...s, b: t }))} />
+                </View>
+              </>
+            ) : stkModal === 'link' ? (
+              <>
+                <Text style={styles.stkTitle}>Link</Text>
+                <TextInput style={styles.stkInput} placeholder="https://..." autoCapitalize="none" keyboardType="url" placeholderTextColor="#888" value={form.url} onChangeText={(t) => setForm((s) => ({ ...s, url: t }))} autoFocus />
+                <TextInput style={styles.stkInput} placeholder="Texto do botão (opcional)" placeholderTextColor="#888" value={form.rotulo} onChangeText={(t) => setForm((s) => ({ ...s, rotulo: t }))} />
+              </>
+            ) : stkModal === 'hashtag' ? (
+              <>
+                <Text style={styles.stkTitle}>Hashtag</Text>
+                <TextInput style={styles.stkInput} placeholder="suatag" autoCapitalize="none" placeholderTextColor="#888" value={form.tag} onChangeText={(t) => setForm((s) => ({ ...s, tag: t }))} autoFocus />
+              </>
+            ) : stkModal === 'contagem' ? (
+              <>
+                <Text style={styles.stkTitle}>Contagem regressiva</Text>
+                <TextInput style={styles.stkInput} placeholder="Título (ex: Live!)" placeholderTextColor="#888" value={form.titulo} onChangeText={(t) => setForm((s) => ({ ...s, titulo: t }))} autoFocus />
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <TextInput style={[styles.stkInput, { flex: 1 }]} placeholder="Dias" keyboardType="number-pad" placeholderTextColor="#888" value={form.dias} onChangeText={(t) => setForm((s) => ({ ...s, dias: t }))} />
+                  <TextInput style={[styles.stkInput, { flex: 1 }]} placeholder="Horas" keyboardType="number-pad" placeholderTextColor="#888" value={form.horas} onChangeText={(t) => setForm((s) => ({ ...s, horas: t }))} />
+                </View>
+              </>
+            ) : null}
+            <TouchableOpacity style={styles.stkOk} onPress={salvarStk}><Text style={styles.stkOkTxt}>Adicionar</Text></TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* MODAL edição de texto */}
       <Modal visible={!!txtEdit} transparent animationType="fade" onRequestClose={() => setTxtEdit(null)}>
         <View style={styles.txtModal}>
@@ -377,6 +491,28 @@ const styles = StyleSheet.create({
   painel: { position: 'absolute', left: 0, right: 0, paddingVertical: 12, backgroundColor: 'rgba(0,0,0,0.55)' },
   painelHint: { color: 'rgba(255,255,255,0.6)', fontSize: 11, textAlign: 'center', marginTop: 8 },
   emojiBtn: { width: 46, height: 46, alignItems: 'center', justifyContent: 'center' },
+  // Painel Figurinhas (tray estilo Instagram)
+  painelFig: { position: 'absolute', left: 0, right: 0, backgroundColor: 'rgba(12,16,28,0.97)', borderTopLeftRadius: 18, borderTopRightRadius: 18, paddingTop: 14, paddingBottom: 10 },
+  figGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 12, justifyContent: 'center' },
+  figBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#fff', borderRadius: 100, paddingHorizontal: 14, paddingVertical: 9 },
+  figBtnTxt: { color: '#0a0a0a', fontSize: 13, fontWeight: '800' },
+  figSec: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 12, marginTop: 14, marginBottom: 4 },
+  // Camadas visuais das novas figurinhas
+  enqBox: { backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: 14, padding: 12, minWidth: 200, alignItems: 'center' },
+  enqPerg: { color: '#0a0a0a', fontSize: 15, fontWeight: '800', marginBottom: 10, textAlign: 'center' },
+  enqOpts: { flexDirection: 'row', gap: 8, alignSelf: 'stretch' },
+  enqOpt: { flex: 1, backgroundColor: 'rgba(0,0,0,0.06)', borderRadius: 10, paddingVertical: 9, alignItems: 'center' },
+  enqOptTxt: { color: '#0a0a0a', fontSize: 13, fontWeight: '700' },
+  contTimer: { color: '#3b82f6', fontSize: 26, fontWeight: '900', letterSpacing: 1 },
+  linkChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 100, paddingHorizontal: 12, paddingVertical: 7 },
+  linkTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  // Modal de criação da figurinha interativa
+  stkModalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', paddingHorizontal: 22 },
+  stkCard: { backgroundColor: '#0f1524', borderRadius: 18, padding: 18, gap: 10 },
+  stkTitle: { color: '#fff', fontSize: 17, fontWeight: '800', marginBottom: 2 },
+  stkInput: { backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 11, color: '#fff', fontSize: 15 },
+  stkOk: { backgroundColor: COLORS.neon, borderRadius: 12, paddingVertical: 12, alignItems: 'center', marginTop: 4 },
+  stkOkTxt: { color: '#fff', fontSize: 15, fontWeight: '800' },
   filtroBtn: { alignItems: 'center', gap: 5, opacity: 0.7 },
   filtroOn: { opacity: 1 },
   filtroSwatch: { width: 46, height: 46, borderRadius: 10, borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)' },

@@ -7,7 +7,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Image, TextInput, Animated,
   KeyboardAvoidingView, Platform, PanResponder, ActivityIndicator, Alert,
-  Modal, Pressable, FlatList, useWindowDimensions,
+  Modal, Pressable, FlatList, useWindowDimensions, Linking,
 } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
 import Svg, { Polyline } from 'react-native-svg';
@@ -19,9 +19,43 @@ const FILTRO_COR = {
   desbotado: 'rgba(255,255,255,0.16)', noite: 'rgba(10,20,60,0.34)',
 };
 
-// Desenha as camadas do editor (texto/figurinha/menção/desenho) + filtro por
-// cima da mídia. box-none: espaço vazio deixa o toque passar pras zonas de
-// avançar/voltar; só a menção captura (abre o perfil).
+function fmtRestanteV(alvoISO) {
+  const ms = new Date(alvoISO).getTime() - Date.now();
+  if (isNaN(ms) || ms <= 0) return '00:00';
+  const d = Math.floor(ms / 86400000), h = Math.floor((ms % 86400000) / 3600000), m = Math.floor((ms % 3600000) / 60000);
+  return d > 0 ? `${d}d ${h}h` : `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+// Enquete no viewer: pergunta + 2 opções; tocar VOTA e revela as porcentagens.
+function EnqueteView({ story, o, pos }) {
+  const [res, setRes] = useState(null); // { contagem:[a,b], minha }
+  useEffect(() => {
+    let vivo = true;
+    blueAPI.enqueteResultado(o.id).then((d) => { if (vivo && d) setRes(d); }).catch(() => {});
+    return () => { vivo = false; };
+  }, [o.id]);
+  const votar = async (opcao) => { try { const d = await blueAPI.votarEnquete(story.id, o.id, opcao); if (d) setRes(d); } catch (e) {} };
+  const total = res ? (res.contagem[0] + res.contagem[1]) : 0;
+  const pct = (i) => (total > 0 ? Math.round((res.contagem[i] / total) * 100) : 0);
+  const votou = res && res.minha != null;
+  return (
+    <View style={[pos, { backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: 14, padding: 12, minWidth: 220, alignItems: 'center' }]}>
+      <Text style={{ color: '#0a0a0a', fontSize: 15, fontWeight: '800', marginBottom: 10, textAlign: 'center' }}>{o.pergunta}</Text>
+      <View style={{ flexDirection: 'row', gap: 8, alignSelf: 'stretch' }}>
+        {[0, 1].map((i) => (
+          <TouchableOpacity key={i} onPress={() => votar(i)} activeOpacity={0.85}
+            style={{ flex: 1, backgroundColor: votou && res.minha === i ? 'rgba(59,130,246,0.22)' : 'rgba(0,0,0,0.06)', borderRadius: 10, paddingVertical: 9, alignItems: 'center' }}>
+            <Text style={{ color: '#0a0a0a', fontSize: 13, fontWeight: '700' }}>{o.opcoes?.[i]}{votou ? `  ${pct(i)}%` : ''}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+// Desenha as camadas do editor (texto/figurinha/menção/desenho/enquete/link/
+// hashtag/contagem) + filtro por cima da mídia. box-none: espaço vazio deixa o
+// toque passar pras zonas de avançar/voltar; só o que é interativo captura.
 function StoryOverlays({ story, W, H, navigation }) {
   const ov = Array.isArray(story?.overlays) ? story.overlays : [];
   const cor = story?.filtro ? FILTRO_COR[story.filtro] : null;
@@ -46,6 +80,26 @@ function StoryOverlays({ story, W, H, navigation }) {
             onPress={() => o.user_id && navigation.navigate('PerfilUsuario', { user_id: o.user_id })}>
             <Text style={{ color: '#fff', fontSize: 22, fontWeight: '800' }}>@{o.username}</Text>
           </TouchableOpacity>
+        );
+        if (o.tipo === 'enquete') return <EnqueteView key={i} story={story} o={o} pos={pos} />;
+        if (o.tipo === 'link') return (
+          <TouchableOpacity key={i} style={[pos, { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 100, paddingHorizontal: 12, paddingVertical: 7 }]}
+            onPress={() => o.url && Linking.openURL(o.url).catch(() => {})}>
+            <Ionicons name="link" size={14} color="#fff" />
+            <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>{o.rotulo || o.url}</Text>
+          </TouchableOpacity>
+        );
+        if (o.tipo === 'hashtag') return (
+          <TouchableOpacity key={i} style={[pos, { backgroundColor: 'rgba(0,0,0,0.35)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 }]}
+            onPress={() => navigation.navigate('Descobrir')}>
+            <Text style={{ color: '#fff', fontSize: 22, fontWeight: '800' }}>#{o.tag}</Text>
+          </TouchableOpacity>
+        );
+        if (o.tipo === 'contagem') return (
+          <View key={i} pointerEvents="none" style={[pos, { backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: 14, padding: 12, alignItems: 'center', minWidth: 160 }]}>
+            <Text style={{ color: '#0a0a0a', fontSize: 14, fontWeight: '800', marginBottom: 4 }}>{o.titulo}</Text>
+            <Text style={{ color: '#3b82f6', fontSize: 26, fontWeight: '900', letterSpacing: 1 }}>{fmtRestanteV(o.alvo)}</Text>
+          </View>
         );
         return null;
       })}
