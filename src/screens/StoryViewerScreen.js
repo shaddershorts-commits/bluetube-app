@@ -101,6 +101,7 @@ function StoryOverlays({ story, W, H, navigation }) {
             <Text style={{ color: '#3b82f6', fontSize: 26, fontWeight: '900', letterSpacing: 1 }}>{fmtRestanteV(o.alvo)}</Text>
           </View>
         );
+        if (o.tipo === 'gif') return <Image key={i} pointerEvents="none" source={{ uri: o.url }} style={[pos, { width: 150, height: o.w && o.h ? Math.round(150 * o.h / o.w) : 150 }]} resizeMode="contain" />;
         return null;
       })}
     </View>

@@ -111,6 +111,15 @@ export default function StoryEditorScreen() {
   // Figurinhas interativas (Fase 2): modal de criação + formulário
   const [stkModal, setStkModal] = useState(null); // 'enquete'|'link'|'hashtag'|'contagem'
   const [form, setForm] = useState({});
+  // GIF (GIPHY via proxy)
+  const [gifQ, setGifQ] = useState('');
+  const [gifRes, setGifRes] = useState([]);
+  const [gifLoad, setGifLoad] = useState(false);
+  const buscarGifs = useCallback(async (q) => {
+    setGifLoad(true);
+    try { const d = await blueAPI.buscarGifs(q); setGifRes((d && d.gifs) || []); } catch (e) { setGifRes([]); }
+    setGifLoad(false);
+  }, []);
 
   const novoId = () => 'ov_' + Date.now() + '_' + Math.round(Math.random() * 1e4);
 
@@ -188,7 +197,7 @@ export default function StoryEditorScreen() {
     { key: 'hashtag', icon: 'pricetag', label: '#hashtag', on: () => abrirStk('hashtag') },
     { key: 'contagem', icon: 'timer-outline', label: 'Contagem', on: () => abrirStk('contagem') },
     { key: 'mencao2', icon: 'at', label: 'Mencionar', on: () => { setPainel('mencao'); } },
-    { key: 'gif', icon: 'images-outline', label: 'GIF (em breve)', on: () => Alert.alert('GIF', 'Os GIFs chegam no próximo build do app (precisa do módulo nativo). Já estou preparando.') },
+    { key: 'gif', icon: 'images-outline', label: 'GIF', on: () => { setPainel('gif'); if (!gifRes.length) buscarGifs(''); } },
   ];
 
   // ── DESENHO ──────────────────────────────────────────────────────────────
@@ -298,6 +307,8 @@ export default function StoryEditorScreen() {
             <View style={styles.mencaoChip}><Text style={styles.mencaoTxt}>#{o.tag}</Text></View>
           ) : o.tipo === 'contagem' ? (
             <View style={styles.enqBox}><Text style={styles.enqPerg}>{o.titulo}</Text><Text style={styles.contTimer}>{fmtRestante(o.alvo)}</Text></View>
+          ) : o.tipo === 'gif' ? (
+            <Image source={{ uri: o.url }} style={{ width: 150, height: o.w && o.h ? Math.round(150 * o.h / o.w) : 150 }} resizeMode="contain" />
           ) : null}
         </Camada>
       ))}
@@ -350,6 +361,24 @@ export default function StoryEditorScreen() {
               </TouchableOpacity>
             ))}
           </ScrollView>
+        </View>
+      ) : null}
+
+      {/* PAINEL GIF (GIPHY) */}
+      {painel === 'gif' ? (
+        <View style={[styles.painelFig, { bottom: insets.bottom + 80, maxHeight: H * 0.6 }]}>
+          <TextInput style={[styles.stkInput, { marginHorizontal: 12 }]} placeholder="Buscar GIF" placeholderTextColor="#888"
+            value={gifQ} onChangeText={(t) => { setGifQ(t); buscarGifs(t); }} autoFocus />
+          {gifLoad ? <ActivityIndicator color={COLORS.neon} style={{ marginTop: 18 }} /> : (
+            <ScrollView contentContainerStyle={styles.gifGrid} keyboardShouldPersistTaps="handled">
+              {gifRes.map((g) => (
+                <TouchableOpacity key={g.id} onPress={() => { addOverlay({ tipo: 'gif', url: g.url, w: g.w, h: g.h }); setPainel(null); }}>
+                  <Image source={{ uri: g.preview || g.url }} style={styles.gifThumb} resizeMode="cover" />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+          <Text style={styles.painelHint}>GIFs por GIPHY</Text>
         </View>
       ) : null}
 
@@ -497,6 +526,8 @@ const styles = StyleSheet.create({
   figBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#fff', borderRadius: 100, paddingHorizontal: 14, paddingVertical: 9 },
   figBtnTxt: { color: '#0a0a0a', fontSize: 13, fontWeight: '800' },
   figSec: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 12, marginTop: 14, marginBottom: 4 },
+  gifGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, padding: 10, justifyContent: 'center' },
+  gifThumb: { width: 104, height: 104, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.06)' },
   // Camadas visuais das novas figurinhas
   enqBox: { backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: 14, padding: 12, minWidth: 200, alignItems: 'center' },
   enqPerg: { color: '#0a0a0a', fontSize: 15, fontWeight: '800', marginBottom: 10, textAlign: 'center' },

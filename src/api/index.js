@@ -481,6 +481,8 @@ export const blueAPI = {
           const token = await getToken();
           return api(`blue-stories?action=ver&story_id=${encodeURIComponent(story_id)}&token=${encodeURIComponent(token)}`);
     },
+    // Busca de GIF (GIPHY via proxy do backend — a chave fica no servidor).
+    buscarGifs: (q) => api(`blue-stories?action=gifs&q=${encodeURIComponent(q || '')}`),
     // Enquete: vota (0|1) numa camada de enquete do story; devolve contagem.
     votarEnquete: async (story_id, overlay_id, opcao) => {
           const token = await getToken();
