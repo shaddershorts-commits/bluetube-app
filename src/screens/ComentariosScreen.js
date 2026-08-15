@@ -67,7 +67,7 @@ function CommentRow({ item, onLike, onReply, onModerate, isReply }) {
 }
 
 export default function ComentariosScreen({ route }) {
-  const { video_id } = route.params;
+  const { video_id } = route.params || {};
   const nav = useNavigation();
   const user = useAuthStore((s) => s.user);
   const blockedIds = useAuthStore((s) => s.blockedIds);

@@ -158,7 +158,7 @@ export default function SettingsScreen() {
   const handleLogout = () => {
     Alert.alert(t('st_logout_t'), t('st_sure'), [
       { text: t('st_cancel'), style: 'cancel' },
-      { text: t('st_logout_t'), style: 'destructive', onPress: logout },
+      { text: t('st_logout_t'), style: 'destructive', onPress: async () => { await logout(); nav.reset({ index: 0, routes: [{ name: 'Main' }] }); } },
     ]);
   };
 

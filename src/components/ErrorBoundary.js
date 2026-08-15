@@ -39,7 +39,9 @@ export default class ErrorBoundary extends React.Component {
 
     if (this.props.compact) {
       return (
-        <View style={{ padding: 28, alignItems: 'center', gap: 8 }}>
+        <View style={this.props.fill
+          ? { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 8, padding: 28, backgroundColor: COLORS.background }
+          : { padding: 28, alignItems: 'center', gap: 8 }}>
           <Text style={{ color: COLORS.text, fontSize: 14.5, fontWeight: '700' }}>
             Não deu pra mostrar isso agora
           </Text>
@@ -74,4 +76,17 @@ export default class ErrorBoundary extends React.Component {
       </View>
     );
   }
+}
+
+// HOC pra dar a CADA tela sua própria cerca: um crash de render numa tela mostra
+// "tentar de novo" só ALI (remonta a tela) em vez de derrubar o app inteiro e
+// resetar a navegação. O boundary raiz (App.js) continua como última defesa.
+export function withErrorBoundary(Component, scope) {
+  const Wrapped = (props) => (
+    <ErrorBoundary compact fill scope={scope}>
+      <Component {...props} />
+    </ErrorBoundary>
+  );
+  Wrapped.displayName = `withBoundary(${scope || 'Screen'})`;
+  return Wrapped;
 }

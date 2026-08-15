@@ -30,32 +30,42 @@ function isAbort(err) {
 // silenciosa de refresh_token por novo access_token. Chama Supabase Auth
 // REST direto — nao depende de api/auth.js (intocavel).
 // Retorna { access_token, refresh_token, user } ou null.
+// LOCK de renovação: chamadas concorrentes (init/revalidar/refreshNow + o
+// auto-refresh do api() no 401) compartilham UMA troca. Sem isso, a 2ª usa o
+// refresh_token que a 1ª já ROTACIONOU/consumiu → 400 {invalid} → logout
+// indevido (fix do "deslogou sozinho ao abrir em rede ruim").
+let _refreshInFlight = null;
 export async function refreshSession(refreshToken, timeoutMs = 15000) {
     if (!refreshToken) return null;
-    try {
-        const r = await fetchComTimeout(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
-            method: 'POST',
-            headers: {
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ refresh_token: refreshToken }),
-        }, timeoutMs);
-        if (!r.ok) {
-            // DISTINÇÃO CRÍTICA (fix "desloga ao abrir" 2026-07-24):
-            // 400/401 = refresh token DE FATO inválido/revogado → { invalid }.
-            // 5xx/outros = problema de infra → null (NUNCA desloga por isso).
-            if (r.status === 400 || r.status === 401) return { invalid: true };
+    if (_refreshInFlight) return _refreshInFlight;
+    _refreshInFlight = (async () => {
+        try {
+            const r = await fetchComTimeout(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+                method: 'POST',
+                headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ refresh_token: refreshToken }),
+            }, timeoutMs);
+            if (!r.ok) {
+                // DISTINÇÃO CRÍTICA (fix "desloga ao abrir" 2026-07-24):
+                // 400/401 = refresh token DE FATO inválido/revogado → { invalid }.
+                // 5xx/outros = problema de infra → null (NUNCA desloga por isso).
+                if (r.status === 400 || r.status === 401) return { invalid: true };
+                return null;
+            }
+            const d = await r.json();
+            if (!d?.access_token) return null;
+            return { access_token: d.access_token, refresh_token: d.refresh_token, user: d.user };
+        } catch (e) {
+            // network error / timeout / DNS — retorna null silencioso (mantém sessão)
             return null;
         }
-        const d = await r.json();
-        if (!d?.access_token) return null;
-        return { access_token: d.access_token, refresh_token: d.refresh_token, user: d.user };
-    } catch (e) {
-        // network error / timeout / DNS — retorna null silencioso (mantém sessão)
-        return null;
-    }
+    })();
+    try { return await _refreshInFlight; }
+    finally { _refreshInFlight = null; }
 }
 
 // LOGIN DIRETO no Supabase Auth (fix RAIZ do "desloga ao abrir", 2026-07-24):
@@ -86,7 +96,25 @@ export async function signinDirect(email, password) {
     }
 }
 
-async function api(endpoint, options = {}) {
+// Renova o token quando uma chamada volta 401 (sessão venceu EM USO). Devolve o
+// token NOVO (string) ou null. Se o refresh estiver DE FATO morto, desloga limpo.
+async function _renovarToken() {
+    try {
+        const refresh = await SecureStore.getItemAsync('bt_refresh_token');
+        if (!refresh) return null;
+        const rs = await refreshSession(refresh, 8000); // compartilha o lock
+        if (rs?.access_token) {
+            if (rs.refresh_token) await SecureStore.setItemAsync('bt_refresh_token', rs.refresh_token).catch(() => {});
+            try { await require('../store').useAuthStore.getState().setToken(rs.access_token); }
+            catch (_) { await SecureStore.setItemAsync('bt_token', rs.access_token).catch(() => {}); }
+            return rs.access_token;
+        }
+        if (rs?.invalid) { try { require('../store').useAuthStore.getState().logout(); } catch (_) {} }
+        return null;
+    } catch (_) { return null; }
+}
+
+async function api(endpoint, options = {}, _retried = false) {
     const url = `${API_BASE}/${endpoint}`;
     const method = options.method || 'GET';
     addBreadcrumb(`API ${method} ${endpoint.split('?')[0]}`, 'http', { method });
@@ -98,6 +126,20 @@ async function api(endpoint, options = {}) {
                       ...options.headers,
               },
         }, 20000);
+        // Sessão venceu EM USO (401): renova UMA vez e repete a chamada. O token
+        // vai embutido na url/body, então troca o antigo pelo novo e re-chama.
+        if (response.status === 401 && !_retried) {
+            const antigo = await getToken();
+            const embedded = antigo && (endpoint.includes(antigo) || (typeof options.body === 'string' && options.body.includes(antigo)));
+            if (embedded) {
+                const novo = await _renovarToken();
+                if (novo && novo !== antigo) {
+                    const ep2 = endpoint.split(antigo).join(novo);
+                    const body2 = (typeof options.body === 'string') ? options.body.split(antigo).join(novo) : options.body;
+                    return api(ep2, { ...options, body: body2 }, true);
+                }
+            }
+        }
         const text = await response.text();
         try { return JSON.parse(text); }
         catch { return { error: text, status: response.status }; }

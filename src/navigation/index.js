@@ -45,9 +45,20 @@ import CriarGrupoScreen from '../screens/CriarGrupoScreen';
 import FollowListScreen from '../screens/FollowListScreen';
 import CallScreen from '../screens/CallScreen';
 import { supabase, autenticarRealtime } from '../lib/supabase';
+import { withErrorBoundary } from '../components/ErrorBoundary';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
+
+// Cada tela ganha sua PRÓPRIA cerca de erro: um crash de render numa tela mostra
+// "tentar de novo" SÓ ali (remonta a tela) em vez de resetar o app inteiro. O
+// boundary raiz (App.js) segue como última defesa. Cache pra referência estável
+// — chamar withErrorBoundary inline no JSX remontaria a tela a cada render.
+const _ebCache = new Map();
+function T(Component, name) {
+  if (!_ebCache.has(Component)) _ebCache.set(Component, withErrorBoundary(Component, name));
+  return _ebCache.get(Component);
+}
 
 // Ref global de navegação: deixa código FORA da árvore de telas navegar
 // (ex.: toque num push de chamada, tratado no useNotifications do App.js).
@@ -215,12 +226,12 @@ function MainTabs() {
                     }
                   },
         })}>
-      <Tab.Screen name="Feed" component={FeedScreen} />
-        <Tab.Screen name="Descobrir" component={DiscoverScreen} />
-        <Tab.Screen name="Camera" component={CameraScreen} options={{ tabBarLabel: '' }} />
-      <Tab.Screen name="Chat" component={ChatScreen}
+      <Tab.Screen name="Feed" component={T(FeedScreen, 'Feed')} />
+        <Tab.Screen name="Descobrir" component={T(DiscoverScreen, 'Descobrir')} />
+        <Tab.Screen name="Camera" component={T(CameraScreen, 'Camera')} options={{ tabBarLabel: '' }} />
+      <Tab.Screen name="Chat" component={T(ChatScreen, 'Chat')}
         options={chatUnread > 0 ? { tabBarBadge: chatUnread > 99 ? '99+' : chatUnread, tabBarBadgeStyle: { backgroundColor: '#ef4444', color: '#fff', fontSize: 10, fontWeight: '800' } } : {}} />
-        <Tab.Screen name="Perfil" component={ProfileScreen} />
+        <Tab.Screen name="Perfil" component={T(ProfileScreen, 'Perfil')} />
   </Tab.Navigator>
   );
 }
@@ -304,34 +315,34 @@ export default function Navigation() {
   return (
         <NavigationContainer ref={navigationRef} theme={NAV_THEME} linking={linking}>
           <Stack.Navigator initialRouteName="Main" screenOptions={{ headerShown: false }}>
-                       <Stack.Screen name="Main" component={MainWithOnboarding} />
+                       <Stack.Screen name="Main" component={T(MainWithOnboarding, 'Main')} />
                        <Stack.Group screenOptions={{ presentation: 'modal' }}>
-                         <Stack.Screen name="Login" component={LoginScreen} />
-                         <Stack.Screen name="Cadastro" component={CadastroScreen} />
-                         <Stack.Screen name="OTP" component={OTPScreen} />
+                         <Stack.Screen name="Login" component={T(LoginScreen, 'Login')} />
+                         <Stack.Screen name="Cadastro" component={T(CadastroScreen, 'Cadastro')} />
+                         <Stack.Screen name="OTP" component={T(OTPScreen, 'OTP')} />
                        </Stack.Group>
-                       <Stack.Screen name="SetupPerfil" component={SetupPerfilScreen} />
-                       <Stack.Screen name="Conversa" component={ConversaScreen} />
-                       <Stack.Screen name="GrupoInfo" component={GrupoInfoScreen} />
-                       <Stack.Screen name="Temas" component={TemasScreen} />
-                       <Stack.Screen name="Atividade" component={AtividadeScreen} />
-                       <Stack.Screen name="StoryEditor" component={StoryEditorScreen} />
-                       <Stack.Screen name="PerfilUsuario" component={PerfilUsuarioScreen} />
-                       <Stack.Screen name="Comentarios" component={ComentariosScreen} />
-                       <Stack.Screen name="Live" component={LiveScreen} />
-                       <Stack.Screen name="PostVideo" component={PostVideoScreen} />
-                       <Stack.Screen name="EditProfile" component={EditProfileScreen} />
-                       <Stack.Screen name="Hashtag" component={HashtagScreen} />
-                       <Stack.Screen name="Saved" component={SavedScreen} />
-                       <Stack.Screen name="Notifications" component={NotificationsScreen} />
-                       <Stack.Screen name="Analytics" component={AnalyticsScreen} />
-                       <Stack.Screen name="Monetizacao" component={MonetizacaoScreen} />
-                       <Stack.Screen name="Settings" component={SettingsScreen} />
-                       <Stack.Screen name="Video" component={VideoScreen} />
-                       <Stack.Screen name="StoryViewer" component={StoryViewerScreen} />
-                       <Stack.Screen name="CriarGrupo" component={CriarGrupoScreen} />
-                       <Stack.Screen name="FollowList" component={FollowListScreen} />
-                       <Stack.Screen name="Call" component={CallScreen} options={{ gestureEnabled: false }} />
+                       <Stack.Screen name="SetupPerfil" component={T(SetupPerfilScreen, 'SetupPerfil')} />
+                       <Stack.Screen name="Conversa" component={T(ConversaScreen, 'Conversa')} />
+                       <Stack.Screen name="GrupoInfo" component={T(GrupoInfoScreen, 'GrupoInfo')} />
+                       <Stack.Screen name="Temas" component={T(TemasScreen, 'Temas')} />
+                       <Stack.Screen name="Atividade" component={T(AtividadeScreen, 'Atividade')} />
+                       <Stack.Screen name="StoryEditor" component={T(StoryEditorScreen, 'StoryEditor')} />
+                       <Stack.Screen name="PerfilUsuario" component={T(PerfilUsuarioScreen, 'PerfilUsuario')} />
+                       <Stack.Screen name="Comentarios" component={T(ComentariosScreen, 'Comentarios')} />
+                       <Stack.Screen name="Live" component={T(LiveScreen, 'Live')} />
+                       <Stack.Screen name="PostVideo" component={T(PostVideoScreen, 'PostVideo')} />
+                       <Stack.Screen name="EditProfile" component={T(EditProfileScreen, 'EditProfile')} />
+                       <Stack.Screen name="Hashtag" component={T(HashtagScreen, 'Hashtag')} />
+                       <Stack.Screen name="Saved" component={T(SavedScreen, 'Saved')} />
+                       <Stack.Screen name="Notifications" component={T(NotificationsScreen, 'Notifications')} />
+                       <Stack.Screen name="Analytics" component={T(AnalyticsScreen, 'Analytics')} />
+                       <Stack.Screen name="Monetizacao" component={T(MonetizacaoScreen, 'Monetizacao')} />
+                       <Stack.Screen name="Settings" component={T(SettingsScreen, 'Settings')} />
+                       <Stack.Screen name="Video" component={T(VideoScreen, 'Video')} />
+                       <Stack.Screen name="StoryViewer" component={T(StoryViewerScreen, 'StoryViewer')} />
+                       <Stack.Screen name="CriarGrupo" component={T(CriarGrupoScreen, 'CriarGrupo')} />
+                       <Stack.Screen name="FollowList" component={T(FollowListScreen, 'FollowList')} />
+                       <Stack.Screen name="Call" component={T(CallScreen, 'Call')} options={{ gestureEnabled: false }} />
 </Stack.Navigator>
   </NavigationContainer>
   );

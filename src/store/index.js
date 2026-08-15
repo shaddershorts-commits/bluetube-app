@@ -53,9 +53,16 @@ export const useAuthStore = create((set) => ({
     set({ introSeen: true });
   },
   logout: async () => {
-    await SecureStore.deleteItemAsync('bt_token');
-    await SecureStore.deleteItemAsync('bt_refresh_token');
-    set({ token: null, user: null, sessaoNaoVerificada: false });
+    await SecureStore.deleteItemAsync('bt_token').catch(() => {});
+    await SecureStore.deleteItemAsync('bt_refresh_token').catch(() => {});
+    // Resíduo do usuário anterior (aparelho compartilhado): a senha salva NÃO
+    // pode sobrar no cofre, e o feed/bloqueados do outro user não podem vazar.
+    await SecureStore.deleteItemAsync('bt_saved_password').catch(() => {});
+    try { useFeedStore.getState().reset(); } catch (_) {}
+    // NÃO chamar unregisterPush aqui: ele grava bt_push_off e o login não limpa
+    // esse flag → desligaria o push no próximo login. O mapeamento no servidor é
+    // sobrescrito quando o próximo usuário registra (register() no login).
+    set({ token: null, user: null, sessaoNaoVerificada: false, blockedIds: [] });
   },
 
   // Tira o app do limbo "token sem usuário" (ver ANTI-ZUMBI no init).

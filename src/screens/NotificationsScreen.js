@@ -46,14 +46,18 @@ export default function NotificationsScreen() {
   const [notifs, setNotifs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [erro, setErro] = useState(false);
 
   const load = useCallback(async () => {
     try {
       const d = await blueAPI.notificacoes();
+      if (d && d.error) { setErro(true); setLoading(false); setRefreshing(false); return; }
+      setErro(false);
       setNotifs((d && (d.notificacoes || d.notifications)) || []);
       // Marca todas como lidas (best-effort)
       blueAPI.marcarNotificacoesLidas().catch(() => {});
     } catch (e) {
+      setErro(true);
       console.error('[NotificationsScreen] erro:', e?.message || e);
     }
     setLoading(false);
@@ -81,9 +85,15 @@ export default function NotificationsScreen() {
       <Header title="Notificações" showBack />
       {notifs.length === 0 ? (
         <View style={styles.empty}>
-          <Text style={styles.emptyIcon}>🔔</Text>
-          <Text style={styles.emptyText}>Sem notificações ainda</Text>
-          <Text style={styles.emptyHint}>Quando alguém curtir, comentar ou seguir, aparece aqui</Text>
+          <Text style={styles.emptyIcon}>{erro ? '📡' : '🔔'}</Text>
+          <Text style={styles.emptyText}>{erro ? 'Não deu pra carregar' : 'Sem notificações ainda'}</Text>
+          {erro ? (
+            <TouchableOpacity onPress={load} activeOpacity={0.85} style={{ marginTop: 14, backgroundColor: COLORS.neon, paddingHorizontal: 22, paddingVertical: 11, borderRadius: 12 }}>
+              <Text style={{ color: '#fff', fontWeight: '700' }}>Tentar de novo</Text>
+            </TouchableOpacity>
+          ) : (
+            <Text style={styles.emptyHint}>Quando alguém curtir, comentar ou seguir, aparece aqui</Text>
+          )}
         </View>
       ) : (
         <FlatList

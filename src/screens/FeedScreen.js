@@ -1,6 +1,6 @@
 import { criarHandlerAtivo, VIEW_CONFIG } from '../utils/viewability';
 import { useEffect, useCallback, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Animated, useWindowDimensions, DeviceEventEmitter } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Animated, useWindowDimensions, DeviceEventEmitter, TouchableOpacity } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useIsFocused } from '@react-navigation/native';
@@ -37,6 +37,7 @@ export default function FeedScreen() {
   // flutua por cima — igual TikTok/Reels. Altura vem do onLayout real do
   // container (winH pode divergir em Android com gesture bar → snap drift).
   const [listH, setListH] = useState(0);
+  const [erro, setErro] = useState(false); // falha ao carregar → "tentar de novo" em vez de "vazio"
   const CARD_H = Math.max(1, Math.round(listH || winH));
   const [showPopup, setShowPopup] = useState(false);
   // Lote 7 — banner sutil quando feed transiciona pra seen_recycle
@@ -82,6 +83,10 @@ export default function FeedScreen() {
     setLoading(true);
     try {
       const d = await blueAPI.feed(reset ? null : cursor);
+      // Falha (offline/timeout/erro): api() devolve {error}. Marca erro pra
+      // mostrar "tentar de novo" no lugar do "feed vazio" (que engana).
+      if (d && d.error) { setErro(true); setLoading(false); return; }
+      setErro(false);
       const videosData = d && d.videos;
       const safeVideos = Array.isArray(videosData) ? videosData : [];
       // Guard mais agressivo: precisa ter id, video_url e user_id (renderItem do FlashList
@@ -118,6 +123,7 @@ export default function FeedScreen() {
         if (newMode === 'seen_recycle' && !reset) showBanner(t('feed_reprises'));
       }
     } catch (e) {
+      setErro(true);
       // NAO silenciar (regra do user). Log no console + Sentry.
       console.error('[FeedScreen] loadFeed falhou:', e?.message || e, {
         reset, cursor, hasMore, videosCount: videos.length,
@@ -175,8 +181,14 @@ export default function FeedScreen() {
   if (!videos.length) {
     return (
       <View style={styles.center}>
-        <Text style={styles.emptyIcon}>🎬</Text>
-        <Text style={styles.emptyText}>{t('feed_empty')}</Text>
+        <Text style={styles.emptyIcon}>{erro ? '📡' : '🎬'}</Text>
+        <Text style={styles.emptyText}>{erro ? 'Não deu pra carregar o feed.' : t('feed_empty')}</Text>
+        {erro ? (
+          <TouchableOpacity onPress={() => loadFeed(true)} activeOpacity={0.85}
+            style={{ marginTop: 16, backgroundColor: COLORS.neon, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 }}>
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Tentar de novo</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
     );
   }

@@ -121,7 +121,7 @@ export default function MonetizacaoScreen() {
           <View style={styles.progWrap}>
             <Text style={styles.progTitulo}>Programa de Monetização</Text>
             <Text style={styles.progSub}>
-              {prog.seguidores.toLocaleString('pt-BR')} {prog.seguidores === 1 ? 'seguidor' : 'seguidores'} · cada etapa libera uma forma nova de ganhar
+              {Number(prog.seguidores || 0).toLocaleString('pt-BR')} {Number(prog.seguidores || 0) === 1 ? 'seguidor' : 'seguidores'} · cada etapa libera uma forma nova de ganhar
             </Text>
 
             {prog.marcos.map((m) => {
@@ -138,7 +138,7 @@ export default function MonetizacaoScreen() {
                         color={m.atingiu ? '#10b981' : COLORS.textDim}
                       />
                       <Text style={[styles.marcoBadgeTxt, m.atingiu && { color: '#10b981' }]}>
-                        {m.min.toLocaleString('pt-BR')}
+                        {Number(m.min || 0).toLocaleString('pt-BR')}
                       </Text>
                     </View>
                     <Text style={styles.marcoTitulo}>{m.titulo}</Text>
@@ -152,7 +152,7 @@ export default function MonetizacaoScreen() {
                         <View style={[styles.barraFill, { width: `${m.progresso}%` }]} />
                       </View>
                       <Text style={styles.marcoFaltam}>
-                        Faltam {m.faltam.toLocaleString('pt-BR')} {m.faltam === 1 ? 'seguidor' : 'seguidores'}
+                        Faltam {Number(m.faltam || 0).toLocaleString('pt-BR')} {Number(m.faltam || 0) === 1 ? 'seguidor' : 'seguidores'}
                       </Text>
                     </>
                   )}

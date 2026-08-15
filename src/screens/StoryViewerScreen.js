@@ -35,8 +35,9 @@ function EnqueteView({ story, o, pos }) {
     return () => { vivo = false; };
   }, [o.id]);
   const votar = async (opcao) => { try { const d = await blueAPI.votarEnquete(story.id, o.id, opcao); if (d) setRes(d); } catch (e) {} };
-  const total = res ? (res.contagem[0] + res.contagem[1]) : 0;
-  const pct = (i) => (total > 0 ? Math.round((res.contagem[i] / total) * 100) : 0);
+  const cont = Array.isArray(res?.contagem) ? res.contagem : null;
+  const total = cont ? ((cont[0] || 0) + (cont[1] || 0)) : 0;
+  const pct = (i) => (total > 0 && cont ? Math.round(((cont[i] || 0) / total) * 100) : 0);
   const votou = res && res.minha != null;
   return (
     <View style={[pos, { backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: 14, padding: 12, minWidth: 220, alignItems: 'center' }]}>
