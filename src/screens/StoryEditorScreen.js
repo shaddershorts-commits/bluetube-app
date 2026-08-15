@@ -10,14 +10,14 @@
 // Mencionar · Desenhar · Efeitos(filtro de cor) · Mais. Áudio(música) e GIF
 // entram na Fase 2. Carinhas AR ficaram de fora (decisão do dono: filtros de
 // cor por enquanto).
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import {
   View, Text, TextInput, StyleSheet, TouchableOpacity, Image, Animated,
   PanResponder, useWindowDimensions, ScrollView, Modal, ActivityIndicator, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Video, ResizeMode } from 'expo-av';
+import { Video, ResizeMode, Audio } from 'expo-av';
 import Svg, { Polyline } from 'react-native-svg';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import blueAPI from '../api';
@@ -123,6 +123,39 @@ export default function StoryEditorScreen() {
     try { const d = await blueAPI.buscarGifs(q); setGifRes((d && d.gifs) || []); } catch (e) { setGifRes([]); }
     setGifLoad(false);
   }, []);
+  // ── MÚSICA (Fase 2) ──────────────────────────────────────────────────────
+  // A faixa escolhida vira uma camada 'musica' nos overlays (título/artista/url)
+  // e também vai em musica_url. O viewer TOCA a url por cima da mídia — não é
+  // "colada" no vídeo (assim é 100% metadados, igual ao Instagram).
+  const [musica, setMusica] = useState(null);      // {url, titulo, artista}
+  const [sons, setSons] = useState([]);
+  const [sonsQ, setSonsQ] = useState('');
+  const [sonsLoad, setSonsLoad] = useState(false);
+  const [sonsOrigem, setSonsOrigem] = useState('royalty'); // 'royalty' | 'original'
+  const [tocandoId, setTocandoId] = useState(null); // id da faixa em preview
+  const previewRef = useRef(null);                   // Audio.Sound do preview
+  const buscarSons = useCallback(async (q, origem) => {
+    setSonsLoad(true);
+    try { const d = await blueAPI.sonsCatalogo({ q, origem }); setSons((d && d.sons) || []); } catch (e) { setSons([]); }
+    setSonsLoad(false);
+  }, []);
+  const pararPreview = useCallback(async () => {
+    try { if (previewRef.current) { await previewRef.current.unloadAsync(); previewRef.current = null; } } catch (_) {}
+    setTocandoId(null);
+  }, []);
+  const preverSom = useCallback(async (s) => {
+    try {
+      if (tocandoId === s.id) { await pararPreview(); return; }
+      await pararPreview();
+      await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
+      const { sound } = await Audio.Sound.createAsync({ uri: s.url }, { shouldPlay: true, volume: 1 });
+      previewRef.current = sound;
+      setTocandoId(s.id);
+      sound.setOnPlaybackStatusUpdate((st) => { if (st.didJustFinish) pararPreview(); });
+    } catch (e) { setTocandoId(null); }
+  }, [tocandoId, pararPreview]);
+  // limpa o preview ao sair da tela
+  useEffect(() => () => { if (previewRef.current) { previewRef.current.unloadAsync().catch(() => {}); } }, []);
 
   const novoId = () => 'ov_' + Date.now() + '_' + Math.round(Math.random() * 1e4);
 
@@ -230,17 +263,24 @@ export default function StoryEditorScreen() {
       return;
     }
     setEnviando(true);
+    await pararPreview();
+    // A música vira uma camada 'musica' (pra mostrar o pill 🎵 no viewer) e
+    // também vai em musica_url (pro viewer tocar por cima da mídia).
+    const overlaysFinais = musica
+      ? [...overlays, { tipo: 'musica', url: musica.url, titulo: musica.titulo, artista: musica.artista }]
+      : overlays;
     try {
       const r = isTexto
-        ? await blueAPI.storyCriarTexto({ cor_fundo: corFundo, overlays, audience: audiencia })
+        ? await blueAPI.storyCriarTexto({ cor_fundo: corFundo, overlays: overlaysFinais, audience: audiencia, musica_url: musica?.url || null })
         : await blueAPI.storyCriar(uri, {
             tipo: isVideo ? 'video' : 'imagem',
             mime: mime || (isVideo ? 'video/mp4' : 'image/jpeg'),
             audience: audiencia,
-            overlays,
+            overlays: overlaysFinais,
             filtro,
             legenda: legenda.trim() || null,
             som_off: isVideo ? somOff : undefined,
+            musica_url: musica?.url || null,
           });
       if (r?.ok || r?.story) {
         nav.goBack();
@@ -261,6 +301,7 @@ export default function StoryEditorScreen() {
   const RAIL = [
     { key: 'texto', icon: 'text', label: 'Texto', on: () => abrirTexto(null) },
     { key: 'figurinhas', icon: 'happy-outline', label: 'Figurinhas', on: () => setPainel(painel === 'figurinhas' ? null : 'figurinhas') },
+    { key: 'musica', icon: 'musical-notes', label: 'Música', on: () => { const abrir = painel !== 'musica'; setPainel(abrir ? 'musica' : null); if (abrir && !sons.length) buscarSons('', sonsOrigem); } },
     { key: 'mencao', icon: 'at', label: 'Mencionar', on: () => setPainel(painel === 'mencao' ? null : 'mencao') },
     { key: 'desenho', icon: 'brush', label: 'Desenhar', on: () => setDesenhando((v) => !v) },
     ...(!isTexto ? [{ key: 'efeitos', icon: 'color-filter-outline', label: 'Efeitos', on: () => setPainel(painel === 'efeitos' ? null : 'efeitos') }] : []),
@@ -274,13 +315,24 @@ export default function StoryEditorScreen() {
         {isTexto ? (
           <View style={[StyleSheet.absoluteFill, { backgroundColor: corFundo }]} />
         ) : isVideo ? (
-          <Video source={{ uri }} style={StyleSheet.absoluteFill} resizeMode={ResizeMode.COVER} shouldPlay isLooping isMuted={somOff} />
+          <Video source={{ uri }} style={StyleSheet.absoluteFill} resizeMode={ResizeMode.COVER} shouldPlay isLooping isMuted={somOff || !!musica || !!tocandoId} />
         ) : (
           <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
         )}
         {/* filtro de cor (só em mídia) */}
         {!isTexto && filtroCor !== 'transparent' ? <View style={[StyleSheet.absoluteFill, { backgroundColor: filtroCor }]} pointerEvents="none" /> : null}
       </View>
+
+      {/* Pill da música escolhida (🎵 artista · título + remover) */}
+      {musica ? (
+        <View style={[styles.musicaPill, { top: insets.top + 54 }]}>
+          <Ionicons name="musical-notes" size={13} color="#fff" />
+          <Text style={styles.musicaPillTxt} numberOfLines={1}>{musica.artista ? `${musica.artista} · ` : ''}{musica.titulo}</Text>
+          <TouchableOpacity onPress={() => { setMusica(null); pararPreview(); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="close" size={14} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      ) : null}
 
       {/* DESENHOS já confirmados */}
       <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -390,6 +442,46 @@ export default function StoryEditorScreen() {
             </ScrollView>
           )}
           <Text style={styles.painelHint}>GIFs por GIPHY</Text>
+        </View>
+      ) : null}
+
+      {/* PAINEL Música (catálogo royalty-free + sons originais) */}
+      {painel === 'musica' ? (
+        <View style={[styles.painelFig, { bottom: insets.bottom + 80, maxHeight: H * 0.62 }]}>
+          <View style={styles.somChips}>
+            {[{ k: 'royalty', l: 'Royalty-free' }, { k: 'original', l: 'Originais' }].map((c) => (
+              <TouchableOpacity key={c.k} onPress={() => { setSonsOrigem(c.k); buscarSons(sonsQ, c.k); }}
+                style={[styles.somChip, sonsOrigem === c.k && styles.somChipOn]}>
+                <Text style={[styles.somChipTxt, sonsOrigem === c.k && styles.somChipTxtOn]}>{c.l}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <TextInput style={[styles.stkInput, { marginHorizontal: 12 }]} placeholder="Buscar música" placeholderTextColor="#888"
+            value={sonsQ} onChangeText={(t) => { setSonsQ(t); buscarSons(t, sonsOrigem); }} />
+          {sonsLoad ? <ActivityIndicator color={COLORS.neon} style={{ marginTop: 18 }} /> : (
+            <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: H * 0.38 }}>
+              {sons.map((s) => {
+                const sel = musica?.url === s.url;
+                return (
+                  <View key={s.id} style={styles.somRow}>
+                    <TouchableOpacity onPress={() => preverSom(s)} style={styles.somPlay}>
+                      <Ionicons name={tocandoId === s.id ? 'pause' : 'play'} size={18} color="#0a0a0a" />
+                    </TouchableOpacity>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.somTitulo} numberOfLines={1}>{s.titulo}</Text>
+                      <Text style={styles.somArtista} numberOfLines={1}>{s.artista || 'Som'}</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => { setMusica({ url: s.url, titulo: s.titulo, artista: s.artista }); pararPreview(); setPainel(null); }}
+                      style={[styles.somUsar, sel && styles.somUsarOn]}>
+                      <Text style={[styles.somUsarTxt, sel && { color: '#fff' }]}>{sel ? '✓' : 'Usar'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+              {!sons.length ? <Text style={styles.painelHint}>{sonsOrigem === 'original' ? 'Sons originais chegam em breve' : 'Nenhuma música encontrada'}</Text> : null}
+            </ScrollView>
+          )}
+          <Text style={styles.painelHint}>Música livre de direitos</Text>
         </View>
       ) : null}
 
@@ -553,6 +645,21 @@ const styles = StyleSheet.create({
   corFundoRow: { position: 'absolute', left: 0, right: 0 },
   corFundoDot: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: 'rgba(255,255,255,0.5)' },
   corFundoOn: { borderColor: '#fff', borderWidth: 3, transform: [{ scale: 1.15 }] },
+  // Música
+  somChips: { flexDirection: 'row', gap: 8, paddingHorizontal: 12, paddingBottom: 8 },
+  somChip: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 100, backgroundColor: 'rgba(0,0,0,0.06)' },
+  somChipOn: { backgroundColor: '#0a0a0a' },
+  somChipTxt: { fontSize: 13, fontWeight: '700', color: '#333' },
+  somChipTxtOn: { color: '#fff' },
+  somRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 8 },
+  somPlay: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#e6e6e6', alignItems: 'center', justifyContent: 'center' },
+  somTitulo: { fontSize: 14, fontWeight: '700', color: '#0a0a0a' },
+  somArtista: { fontSize: 12, color: '#777', marginTop: 1 },
+  somUsar: { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 100, backgroundColor: '#eee' },
+  somUsarOn: { backgroundColor: COLORS.neon },
+  somUsarTxt: { fontSize: 13, fontWeight: '800', color: '#0a0a0a' },
+  musicaPill: { position: 'absolute', alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: '80%', backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 100 },
+  musicaPillTxt: { color: '#fff', fontSize: 13, fontWeight: '600', flexShrink: 1 },
   // Camadas visuais das novas figurinhas
   enqBox: { backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: 14, padding: 12, minWidth: 200, alignItems: 'center' },
   enqPerg: { color: '#0a0a0a', fontSize: 15, fontWeight: '800', marginBottom: 10, textAlign: 'center' },

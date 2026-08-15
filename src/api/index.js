@@ -484,7 +484,7 @@ export const blueAPI = {
     // Busca de GIF (GIPHY via proxy do backend — a chave fica no servidor).
     buscarGifs: (q) => api(`blue-stories?action=gifs&q=${encodeURIComponent(q || '')}`),
     // Story só de TEXTO (fundo colorido, sem upload de mídia) — modo "Criar".
-    storyCriarTexto: async ({ cor_fundo, overlays, audience } = {}) => {
+    storyCriarTexto: async ({ cor_fundo, overlays, audience, musica_url } = {}) => {
           const token = await getToken();
           return api('blue-stories', {
                 method: 'POST',
@@ -493,9 +493,13 @@ export const blueAPI = {
                       cor_fundo: cor_fundo || '#1a6bff', duracao: 6,
                       audience: audience || 'stories',
                       overlays: Array.isArray(overlays) ? overlays : [],
+                      musica_url: musica_url || null,
                 }),
           });
     },
+    // Catálogo de músicas do story (royalty-free + sons originais). Público.
+    // origem: 'royalty' | 'original' | undefined (todos). q: busca por título/artista.
+    sonsCatalogo: ({ q, origem } = {}) => api(`blue-stories?action=sons${q ? '&q=' + encodeURIComponent(q) : ''}${origem ? '&origem=' + encodeURIComponent(origem) : ''}`),
     // Enquete: vota (0|1) numa camada de enquete do story; devolve contagem.
     votarEnquete: async (story_id, overlay_id, opcao) => {
           const token = await getToken();
@@ -531,7 +535,7 @@ export const blueAPI = {
     //      batia com policy por dono.
     // Agora usa o MESMO caminho ja provado do upload de video/midia do chat:
     // token do usuario + bucket blue-videos + prefixo `<sub do JWT>/`.
-    storyCriar: async (mediaUri, { tipo = 'imagem', duracao, mime, audience, overlays, filtro, legenda, som_off } = {}) => {
+    storyCriar: async (mediaUri, { tipo = 'imagem', duracao, mime, audience, overlays, filtro, legenda, som_off, musica_url } = {}) => {
           const token = await getToken();
           if (!token) return { error: 'Login necessario' };
           try {
@@ -567,6 +571,7 @@ export const blueAPI = {
                             filtro: filtro || null,
                             texto: legenda || null,
                             som_off: !!som_off,
+                            musica_url: musica_url || null,
                       }),
                 });
           } catch (e) {

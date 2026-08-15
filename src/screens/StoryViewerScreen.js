@@ -9,7 +9,7 @@ import {
   KeyboardAvoidingView, Platform, PanResponder, ActivityIndicator, Alert,
   Modal, Pressable, FlatList, useWindowDimensions, Linking,
 } from 'react-native';
-import { Video, ResizeMode } from 'expo-av';
+import { Video, ResizeMode, Audio } from 'expo-av';
 import Svg, { Polyline } from 'react-native-svg';
 
 // Mesmas cores de filtro do editor (StoryEditorScreen) — reaplica por cima.
@@ -187,6 +187,34 @@ export default function StoryViewerScreen({ route, navigation }) {
     return () => { animRef.current?.stop(); };
   }, [story?.id, paused, goNext]);
 
+  // ── MÚSICA do story: toca a faixa por cima da mídia (metadados, estilo IG).
+  // A url vem de musica_url ou da camada 'musica' dos overlays. Se houver música,
+  // o áudio próprio do vídeo é mutado pra não sobrepor.
+  const musicaOverlay = Array.isArray(story?.overlays) ? story.overlays.find((o) => o && o.tipo === 'musica') : null;
+  const musicaUrl = story?.musica_url || musicaOverlay?.url || null;
+  const musicaRef = useRef(null);
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      try { if (musicaRef.current) { await musicaRef.current.unloadAsync(); musicaRef.current = null; } } catch (_) {}
+      if (!musicaUrl) return;
+      try {
+        await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
+        const { sound } = await Audio.Sound.createAsync({ uri: musicaUrl }, { shouldPlay: !paused, isLooping: true, volume: 1 });
+        if (!vivo) { sound.unloadAsync().catch(() => {}); return; }
+        musicaRef.current = sound;
+      } catch (_) {}
+    })();
+    return () => { vivo = false; };
+  }, [story?.id, musicaUrl]);
+  useEffect(() => {
+    const s = musicaRef.current;
+    if (!s) return;
+    if (paused) s.pauseAsync().catch(() => {});
+    else s.playAsync().catch(() => {});
+  }, [paused]);
+  useEffect(() => () => { if (musicaRef.current) musicaRef.current.unloadAsync().catch(() => {}); }, []);
+
   // Swipe pra baixo fecha (estilo IG)
   const closePan = useRef(PanResponder.create({
     onMoveShouldSetPanResponder: (_, g) => g.dy > 70 && Math.abs(g.dx) < 80,
@@ -270,6 +298,7 @@ export default function StoryViewerScreen({ route, navigation }) {
             resizeMode={ResizeMode.COVER}
             shouldPlay={!paused}
             isLooping={false}
+            isMuted={!!musicaUrl || !!story.som_off}
           />
         ) : story.tipo === 'video_share' ? (
           <View style={styles.shareWrap}>
@@ -344,6 +373,16 @@ export default function StoryViewerScreen({ route, navigation }) {
           <Ionicons name="close" size={28} color="#fff" />
         </TouchableOpacity>
       </View>
+
+      {/* Pill da música tocando (🎵 artista · título) */}
+      {musicaUrl ? (
+        <View style={[styles.musicaPillV, { top: insets.top + 58 }]} pointerEvents="none">
+          <Ionicons name="musical-notes" size={13} color="#fff" />
+          <Text style={styles.musicaPillVTxt} numberOfLines={1}>
+            {musicaOverlay?.artista ? `${musicaOverlay.artista} · ` : ''}{musicaOverlay?.titulo || 'Som'}
+          </Text>
+        </View>
+      ) : null}
 
       {/* Rodape do MEU status: quem viu */}
       {isMine && (
@@ -428,6 +467,8 @@ const styles = StyleSheet.create({
   barFill: { height: '100%', backgroundColor: '#fff', borderRadius: 2 },
   header: { position: 'absolute', left: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerName: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  musicaPillV: { position: 'absolute', alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: '72%', backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 100 },
+  musicaPillVTxt: { color: '#fff', fontSize: 12.5, fontWeight: '600', flexShrink: 1 },
   footer: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 14 },
   emojiRow: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 12 },
   emoji: { fontSize: 30 },
