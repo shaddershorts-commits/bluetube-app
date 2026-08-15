@@ -29,6 +29,7 @@ export function useNotifications(userToken) {
   }, [userToken]);
 
   useEffect(() => {
+    let routerIv = null; // interval de re-tentativa de navegação (limpar no unmount)
     const rotear = (response) => {
       const data = response?.notification?.request?.content?.data || {};
       // Push de CHAMADA: toca direto pra tela de atender (o CallScreen valida
@@ -52,9 +53,10 @@ export function useNotifications(userToken) {
         // app abrindo frio: o navigator pode não estar pronto ainda — re-tenta
         if (!navegar()) {
           let tentativas = 0;
-          const iv = setInterval(() => {
+          if (routerIv) clearInterval(routerIv);
+          routerIv = setInterval(() => {
             tentativas += 1;
-            if (navegar() || tentativas > 20) clearInterval(iv);
+            if (navegar() || tentativas > 20) clearInterval(routerIv);
           }, 500);
         }
         return;
@@ -76,7 +78,7 @@ export function useNotifications(userToken) {
       })
       .catch(() => {});
 
-    return () => sub.remove();
+    return () => { sub.remove(); if (routerIv) clearInterval(routerIv); };
   }, []);
 }
 

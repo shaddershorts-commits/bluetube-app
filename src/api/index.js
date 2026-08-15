@@ -812,7 +812,11 @@ export const blueAPI = {
 
           // Step 2: upload binario direto pro Supabase Storage
           const uploadUrl = `${metaResp.supabase_url}/storage/v1/object/blue-videos/${metaResp.storage_path}`;
-          const uploadTask = FileSystem.createUploadTask(
+          // 1 RETRY no envio do binário: se a rede cai no meio (arquivo grande no
+          // 4G), tenta de novo antes de desistir — senão o vídeo se perde e o
+          // usuário recomeça do zero. Cada tentativa cria uma task nova (a task só
+          // roda uma vez). x-upsert:true → o retry sobrescreve o parcial.
+          const fazerUpload = () => FileSystem.createUploadTask(
                 uploadUrl,
                 videoUri,
                 {
@@ -830,18 +834,23 @@ export const blueAPI = {
                             onProgress(p.totalBytesSent / p.totalBytesExpectedToSend);
                       }
                 }
-          );
+          ).uploadAsync();
 
-          try {
-                const uploadRes = await uploadTask.uploadAsync();
-                if (uploadRes.status >= 400) {
-                      captureError(new Error('upload_failed'), { status: uploadRes.status, body: uploadRes.body?.slice(0, 200) });
-                      return { error: `Falha no upload (HTTP ${uploadRes.status})` };
+          let uploadOk = false, ultimoErro = '';
+          for (let tentativa = 1; tentativa <= 2 && !uploadOk; tentativa++) {
+                try {
+                      const uploadRes = await fazerUpload();
+                      if (uploadRes.status >= 400) {
+                            ultimoErro = `HTTP ${uploadRes.status}`;
+                            captureError(new Error('upload_failed'), { status: uploadRes.status, tentativa, body: uploadRes.body?.slice(0, 200) });
+                      } else { uploadOk = true; }
+                } catch (e) {
+                      ultimoErro = e.message || 'falha';
+                      captureError(e, { step: 'storage-upload', tentativa });
                 }
-          } catch (e) {
-                captureError(e, { step: 'storage-upload' });
-                return { error: e.message || 'Falha no upload' };
+                if (!uploadOk && tentativa < 2 && onProgress) onProgress(0); // reseta a barra pro retry
           }
+          if (!uploadOk) return { error: `Falha no upload (${ultimoErro}). Tenta de novo.` };
 
           if (onProgress) onProgress(1);
           addBreadcrumb('publicarVideo:ok', 'upload', { video_id: metaResp.video?.id });

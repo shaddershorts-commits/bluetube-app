@@ -95,6 +95,9 @@ export default function DiscoverScreen() {
     Keyboard.dismiss();
   };
 
+  // Limpa o debounce da busca ao sair da tela (evita setState pós-unmount)
+  useEffect(() => () => { if (buscaDeb.current) clearTimeout(buscaDeb.current); }, []);
+
   const cardW = (W - GAP * 4) / 3;
   const cardH = cardW * 1.55;
 

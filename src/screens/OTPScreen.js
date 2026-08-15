@@ -49,6 +49,7 @@ export default function OTPScreen({ navigation, route }) {
   const [timer, setTimer] = useState(RESEND_SECS);
   const [canResend, setCanResend] = useState(false);
   const inputs = useRef([]);
+  const resendRef = useRef(null); // interval do reenvio (limpar ao sair)
   const { setToken, setUser } = useAuthStore();
 
   // Countdown
@@ -62,6 +63,8 @@ export default function OTPScreen({ navigation, route }) {
     }, 1000);
     return () => clearInterval(id);
   }, []);
+  // Limpa o interval de reenvio se sair da tela antes de ele zerar
+  useEffect(() => () => { if (resendRef.current) clearInterval(resendRef.current); }, []);
 
   const focusNext = (index) => {
     if (index < OTP_LEN - 1) inputs.current[index + 1]?.focus();
@@ -180,9 +183,10 @@ export default function OTPScreen({ navigation, route }) {
 
     // Reiniciar timer
     setTimer(RESEND_SECS);
-    const id = setInterval(() => {
+    if (resendRef.current) clearInterval(resendRef.current);
+    resendRef.current = setInterval(() => {
       setTimer(t => {
-        if (t <= 1) { clearInterval(id); setCanResend(true); return 0; }
+        if (t <= 1) { clearInterval(resendRef.current); setCanResend(true); return 0; }
         return t - 1;
       });
     }, 1000);

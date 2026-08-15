@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { useAuthStore } from '../store';
+import { registerPush } from '../hooks/useNotifications';
 import { COLORS, API_BASE } from '../constants';
 import blueAPI from '../api';
 
@@ -265,7 +266,7 @@ export default function SetupPerfilScreen({ navigation }) {
             <View style={{alignItems:'center'}}>
         <Text style={S.title}>Notificacoes</Text>
         <Text style={S.sub}>Saiba quando alguem curtir ou seguir voce</Text>
-        <TouchableOpacity style={[S.notifBtn, notifOk&&S.notifOn]} onPress={()=>setNotifOk(v=>!v)}>
+        <TouchableOpacity style={[S.notifBtn, notifOk&&S.notifOn]} onPress={async ()=>{ if(notifOk){setNotifOk(false);return;} const ok = await registerPush(); setNotifOk(!!ok); }}>
           <Ionicons name={notifOk?'notifications':'notifications-outline'} size={28} color={notifOk?'#fff':COLORS.textDim} />
                 <Text style={[S.notifTxt,notifOk&&{color:'#fff'}]}>{notifOk?'Notificacoes ativas!':'Ativar notificacoes'}</Text>
       </TouchableOpacity>

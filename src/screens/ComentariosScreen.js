@@ -73,6 +73,7 @@ export default function ComentariosScreen({ route }) {
   const blockedIds = useAuthStore((s) => s.blockedIds);
   const [comments, setComments] = useState([]); // flat, com creator
   const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState(false);
   const [texto, setTexto] = useState('');
   const [replyTo, setReplyTo] = useState(null); // comentário-raiz sendo respondido
   const [expanded, setExpanded] = useState({}); // { [parentId]: true }
@@ -82,8 +83,10 @@ export default function ComentariosScreen({ route }) {
   const load = useCallback(async () => {
     try {
       const d = await blueAPI.comentarios(video_id);
+      if (d && d.error) { setErro(true); setLoading(false); return; }
+      setErro(false);
       setComments(Array.isArray(d.comments) ? d.comments : []);
-    } catch (_) {}
+    } catch (_) { setErro(true); }
     setLoading(false);
   }, [video_id]);
 
@@ -191,7 +194,9 @@ export default function ComentariosScreen({ route }) {
           data={rows}
           keyExtractor={(row, i) => (row.item?.id || row.parentId || 'r') + '_' + row.type + '_' + i}
           renderItem={renderRow}
-          ListEmptyComponent={<Text style={styles.empty}>Nenhum comentário ainda. Seja o primeiro!</Text>}
+          ListEmptyComponent={erro
+            ? (<TouchableOpacity onPress={load} activeOpacity={0.85} style={{ alignSelf: 'center', marginTop: 40, backgroundColor: '#1a6bff', paddingHorizontal: 22, paddingVertical: 11, borderRadius: 12 }}><Text style={{ color: '#fff', fontWeight: '700' }}>Não deu pra carregar — tentar de novo</Text></TouchableOpacity>)
+            : (<Text style={styles.empty}>Nenhum comentário ainda. Seja o primeiro!</Text>)}
           contentContainerStyle={{ paddingBottom: 12 }}
           keyboardShouldPersistTaps="handled"
         />

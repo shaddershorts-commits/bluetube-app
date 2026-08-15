@@ -46,6 +46,7 @@ export default function ChatScreen() {
   const [meuStatus, setMeuStatus] = useState(null);
   const [reqCount, setReqCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [convMenu, setConvMenu] = useState(null); // item alvo do long-press
   const [showRequests, setShowRequests] = useState(false);
@@ -66,7 +67,8 @@ export default function ChatScreen() {
       setStatusGroups((s?.users || []).filter((u) => Array.isArray(u.stories) && u.stories.length > 0));
       setMeuStatus(s?.meu && Array.isArray(s.meu.stories) && s.meu.stories.length ? s.meu : null);
       setReqCount((cr?.requests || []).length);
-    } catch (_) {}
+      setErro(!c || !!c.error); // conversas falhou (offline/erro) → "tentar de novo"
+    } catch (_) { setErro(true); }
     setLoading(false);
   }, []);
 
@@ -228,9 +230,15 @@ export default function ChatScreen() {
       ) : tab === 'conversas' ? (
         itens.length === 0 ? (
           <View style={styles.empty}>
-            <Text style={styles.emptyIcon}>💬</Text>
-            <Text style={styles.emptyText}>{busca ? 'Nenhuma conversa encontrada' : 'Nenhuma conversa ainda'}</Text>
-            <Text style={styles.emptySub}>{busca ? 'Tenta outro nome' : 'Envie uma mensagem pelo perfil de alguém'}</Text>
+            <Text style={styles.emptyIcon}>{erro ? '📡' : '💬'}</Text>
+            <Text style={styles.emptyText}>{erro ? 'Não deu pra carregar' : (busca ? 'Nenhuma conversa encontrada' : 'Nenhuma conversa ainda')}</Text>
+            {erro ? (
+              <TouchableOpacity onPress={load} activeOpacity={0.85} style={{ marginTop: 14, backgroundColor: T.accent, paddingHorizontal: 22, paddingVertical: 11, borderRadius: 12 }}>
+                <Text style={{ color: '#fff', fontWeight: '700' }}>Tentar de novo</Text>
+              </TouchableOpacity>
+            ) : (
+              <Text style={styles.emptySub}>{busca ? 'Tenta outro nome' : 'Envie uma mensagem pelo perfil de alguém'}</Text>
+            )}
           </View>
         ) : (
           <FlatList

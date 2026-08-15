@@ -183,7 +183,12 @@ export default function CameraScreen() {
   const iniciarGravacao = async () => {
     if (!cameraRef.current || recordingRef.current || publicando) return;
     try {
-      if (!micPerm?.granted) await requestMic();
+      if (!micPerm?.granted) {
+        const r = await requestMic();
+        if (!r?.granted) {
+          Alert.alert('Sem microfone', 'O vídeo vai gravar SEM som (acesso ao microfone negado). Você pode liberar nas configurações do app.');
+        }
+      }
       await rodarTemporizador();
       setCamMode('video');
       await esperarCameraPronta();

@@ -63,7 +63,7 @@ export default function ProfileScreen() {
         blueAPI.monetizacaoStatus().catch(() => null),
         blueAPI.storiesMeus().catch(() => null),
       ]);
-      setProfile((pr && (pr.profile || pr)) || null);
+      setProfile((pr && !pr.error && (pr.profile || pr)) || null);
       setVideos((vr && vr.videos) || []);
       setStats(sr || null);
       // Anel azul: tenho story ativo (não expirado)?
