@@ -8,15 +8,32 @@ async function getToken() {
     return await SecureStore.getItemAsync('bt_token');
 }
 
+// fetch com PRAZO: aborta depois de `ms` pra nenhuma chamada pendurar pra
+// sempre (sinal fraco / portal cativo de Wi-Fi). AbortController é suportado
+// no RN/Hermes; AbortSignal.timeout às vezes não, então usamos o controller
+// manual. Exportado pra reusar na validação de sessão do boot (store).
+export async function fetchComTimeout(url, opts = {}, ms = 20000) {
+    const ctrl = new AbortController();
+    const id = setTimeout(() => ctrl.abort(), ms);
+    try {
+        return await fetch(url, { ...opts, signal: ctrl.signal });
+    } finally {
+        clearTimeout(id);
+    }
+}
+function isAbort(err) {
+    return err && (err.name === 'AbortError' || /abort/i.test(err.message || ''));
+}
+
 // Fix 1 PII (auditoria 2026-04-24): refresh-token auto-login.
 // Substitui o pre-preenchimento de senha (bt_last_password) por troca
 // silenciosa de refresh_token por novo access_token. Chama Supabase Auth
 // REST direto — nao depende de api/auth.js (intocavel).
 // Retorna { access_token, refresh_token, user } ou null.
-export async function refreshSession(refreshToken) {
+export async function refreshSession(refreshToken, timeoutMs = 15000) {
     if (!refreshToken) return null;
     try {
-        const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+        const r = await fetchComTimeout(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
             method: 'POST',
             headers: {
                 'apikey': SUPABASE_ANON_KEY,
@@ -24,7 +41,7 @@ export async function refreshSession(refreshToken) {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ refresh_token: refreshToken }),
-        });
+        }, timeoutMs);
         if (!r.ok) {
             // DISTINÇÃO CRÍTICA (fix "desloga ao abrir" 2026-07-24):
             // 400/401 = refresh token DE FATO inválido/revogado → { invalid }.
@@ -48,7 +65,7 @@ export async function refreshSession(refreshToken) {
 // auth.js do site segue intocado (regra de ouro).
 export async function signinDirect(email, password) {
     try {
-        const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+        const r = await fetchComTimeout(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
             method: 'POST',
             headers: {
                 'apikey': SUPABASE_ANON_KEY,
@@ -56,7 +73,7 @@ export async function signinDirect(email, password) {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ email, password }),
-        });
+        }, 15000);
         const d = await r.json().catch(() => ({}));
         if (!r.ok) {
             const msg = d.error_description || d.msg || d.error || 'Credenciais inválidas';
@@ -64,7 +81,8 @@ export async function signinDirect(email, password) {
         }
         return { access_token: d.access_token, refresh_token: d.refresh_token, user: d.user };
     } catch (e) {
-        return { error: e.message || 'network_error' };
+        if (isAbort(e)) return { error: 'Tempo esgotado — tente de novo' };
+        return { error: 'Sem conexão com a internet' };
     }
 }
 
@@ -73,19 +91,22 @@ async function api(endpoint, options = {}) {
     const method = options.method || 'GET';
     addBreadcrumb(`API ${method} ${endpoint.split('?')[0]}`, 'http', { method });
     try {
-        const response = await fetch(url, {
+        const response = await fetchComTimeout(url, {
               ...options,
               headers: {
                       'Content-Type': 'application/json',
                       ...options.headers,
               },
-        });
+        }, 20000);
         const text = await response.text();
         try { return JSON.parse(text); }
         catch { return { error: text, status: response.status }; }
     } catch (error) {
         captureError(error, { endpoint, method });
-        return { error: error.message || 'network_error', status: 0 };
+        // Prazo estourado → mensagem clara (senão o botão fica girando pra sempre).
+        if (isAbort(error)) return { error: 'Tempo esgotado — tente de novo', status: 0, timeout: true };
+        // Erro de rede (offline/DNS) → mensagem amigável em vez de "Network request failed".
+        return { error: 'Sem conexão com a internet', offline: true, status: 0 };
     }
 }
 

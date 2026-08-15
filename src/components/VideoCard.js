@@ -50,6 +50,17 @@ export default function VideoCard({ video, index, cardHeight, activeOverride, ne
   const baseActive = typeof activeOverride === 'boolean' ? activeOverride : currentIndex === index;
   const [pausedManually, setPausedManually] = useState(false);
   const isActive = baseActive && isFocused && appActive !== false && !pausedManually;
+  // RECUPERAÇÃO DE PLAYER (fix "trava e fica preto"): o ExoPlayer pode entrar
+  // em estado de erro (blip de rede, ou o SO reivindica o decoder após muito
+  // scroll) e o card fica PRETO pra sempre. onError remonta o <Video> (recarrega).
+  // Trava anti-loop: no máx 3 tentativas; depois deixa o pôster/thumbnail à mostra.
+  const [playerKey, setPlayerKey] = useState(0);
+  const errCountRef = useRef(0);
+  const onVideoError = useCallback(() => {
+    if (errCountRef.current < 3) { errCountRef.current += 1; setPlayerKey((k) => k + 1); }
+  }, []);
+  // card reciclado pra outro vídeo → zera o contador de tentativas
+  useEffect(() => { errCountRef.current = 0; }, [video.id]);
   // PERF INSTAGRAM (user 2026-07-24, "trava ao rolar / não reproduz"): o
   // PLAYER só monta perto do ativo (ativo ±1). Longe = thumbnail leve.
   // Antes TODO card montava um <Video> → N players carregando juntos no
@@ -62,8 +73,10 @@ export default function VideoCard({ video, index, cardHeight, activeOverride, ne
     ? nearActive
     : (typeof activeOverride === 'boolean'
       ? activeOverride
-      // pré-carga assimétrica no feed também: 1 atrás, 2 à frente
-      : (index >= idxAtual - 1 && index <= idxAtual + 2));
+      // pré-carga assimétrica no feed: 1 atrás, 1 à frente (3 players). Era +2
+      // (4 players) — reduzido pra dar folga de decoder no flick rápido de
+      // aparelho fraco, que estourava o ExoPlayer e deixava preto.
+      : (index >= idxAtual - 1 && index <= idxAtual + 1));
   const videoRef = useRef(null);
   const nav = useNavigation();
   const { width: W } = useWindowDimensions();
@@ -440,6 +453,7 @@ export default function VideoCard({ video, index, cardHeight, activeOverride, ne
         <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
         {montaPlayer ? (
           <Video
+            key={video.id + ':' + playerKey}
             ref={videoRef}
             source={{ uri: video.video_url }}
             style={StyleSheet.absoluteFill}
@@ -449,6 +463,7 @@ export default function VideoCard({ video, index, cardHeight, activeOverride, ne
             isMuted={muted}
             onLoad={handleVideoLoad}
             onReadyForDisplay={marcarPronto}
+            onError={onVideoError}
           />
         ) : null}
         {video.thumbnail_url && !temImagem ? (

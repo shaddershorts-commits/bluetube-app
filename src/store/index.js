@@ -69,9 +69,10 @@ export const useAuthStore = create((set) => ({
     if (!token || !sessaoNaoVerificada) return;
     try {
       const { SUPABASE_URL, SUPABASE_ANON_KEY } = require('../constants');
-      const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      const { fetchComTimeout } = require('../api');
+      const r = await fetchComTimeout(`${SUPABASE_URL}/auth/v1/user`, {
         headers: { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + token },
-      });
+      }, 3500);
       if (r.ok) {
         const u = await r.json();
         set({ user: u, sessaoNaoVerificada: false });
@@ -83,7 +84,7 @@ export const useAuthStore = create((set) => ({
         const refresh = await SecureStore.getItemAsync('bt_refresh_token').catch(() => null);
         if (refresh) {
           const { refreshSession } = require('../api');
-          const rs = await refreshSession(refresh);
+          const rs = await refreshSession(refresh, 6000);
           if (rs?.access_token) {
             await SecureStore.setItemAsync('bt_token', rs.access_token).catch(() => {});
             if (rs.refresh_token) await SecureStore.setItemAsync('bt_refresh_token', rs.refresh_token).catch(() => {});
@@ -99,6 +100,15 @@ export const useAuthStore = create((set) => ({
     } catch (e) { /* rede ainda ruim: tenta na próxima */ }
   },
   init: async () => {
+    // REDE DE SEGURANÇA: aconteça o que acontecer (qualquer await que pendure),
+    // o splash sai em até 5s. Os fetches já têm timeout de 3.5s; isto é a última
+    // linha de defesa pra NUNCA travar na tela de abertura.
+    const _netSafety = setTimeout(() => {
+      if (useAuthStore.getState().isLoading) {
+        console.warn('[init] rede de segurança: forçando isLoading=false');
+        set({ isLoading: false });
+      }
+    }, 10000);
     // Fix 1 PII (auditoria 2026-04-24): valida token salvo no startup.
     // Se invalido (401/403), tenta refresh via bt_refresh_token (auto-login
     // sem precisar de senha). Substitui o esquema antigo de bt_last_password
@@ -133,9 +143,12 @@ export const useAuthStore = create((set) => ({
       if (token) {
         try {
           const { SUPABASE_URL, SUPABASE_ANON_KEY } = require('../constants');
-          const uR = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+          const { fetchComTimeout } = require('../api');
+          // Timeout 3.5s: em rede ruim a validação NÃO pode pendurar o splash.
+          // Se estourar, cai no catch abaixo → mantém o token salvo (otimista).
+          const uR = await fetchComTimeout(`${SUPABASE_URL}/auth/v1/user`, {
             headers: { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + token },
-          });
+          }, 3500);
           if (uR.ok) {
             validUser = await uR.json();
           } else if (uR.status === 401 || uR.status === 403) {
@@ -156,7 +169,7 @@ export const useAuthStore = create((set) => ({
       // Se token foi invalidado mas existe refresh → tenta trocar
       if (!validToken && refresh) {
         const { refreshSession } = require('../api');
-        const rs = await refreshSession(refresh);
+        const rs = await refreshSession(refresh, 6000);
         if (rs?.access_token) {
           validToken = rs.access_token;
           validUser = rs.user || null;
@@ -213,6 +226,8 @@ export const useAuthStore = create((set) => ({
     } catch (e) {
       console.error('[useAuthStore.init] erro:', e?.message || e);
       set({ isLoading: false });
+    } finally {
+      clearTimeout(_netSafety);
     }
   },
 }));

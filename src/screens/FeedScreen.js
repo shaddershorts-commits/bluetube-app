@@ -144,6 +144,26 @@ export default function FeedScreen() {
   const idxRef = useRef(0);
   const onViewableItemsChanged = useRef(criarHandlerAtivo(setCurrentIndex, idxRef)).current;
 
+  // TETO DE MEMÓRIA (fix "trava e fica preto" em sessões longas): quando a lista
+  // passa de 120 vídeos, apara o topo JÁ-VISTO (feed é forward-only) e reancora
+  // o scroll no MESMO vídeo. Como o item tem altura fixa (CARD_H) e a lista é
+  // paginada/snap, novoIdx*CARD_H é o offset exato do mesmo vídeo → sem pulo.
+  useEffect(() => {
+    if (videos.length <= 120) return;
+    const idx = idxRef.current || 0;
+    const corte = idx - 15;            // mantém 15 atrás do ativo como folga
+    if (corte <= 0) return;
+    const novoIdx = idx - corte;
+    // setState FUNCIONAL (lê o array fresco): não descarta itens que um
+    // loadMore concorrente tenha acabado de anexar. Reancora no rAF — pode
+    // haver 1 frame de transição, imperceptível (1x a cada ~100 vídeos).
+    useFeedStore.setState((s) => ({ videos: s.videos.slice(corte), currentIndex: novoIdx }));
+    idxRef.current = novoIdx;
+    requestAnimationFrame(() => {
+      try { listRef.current?.scrollToOffset({ offset: novoIdx * CARD_H, animated: false }); } catch (_) {}
+    });
+  }, [videos.length, CARD_H]);
+
   if (isLoading && videos.length === 0) {
     return (
       <View style={styles.center}>
