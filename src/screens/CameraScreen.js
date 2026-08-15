@@ -168,7 +168,10 @@ export default function CameraScreen() {
       const foto = await cameraRef.current.takePictureAsync({ quality: 0.9 });
       if (foto?.uri) {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-        setPreview({ uri: foto.uri, tipo: 'imagem' });
+        // Vai DIRETO pro editor (figurinhas/filtros/enquete/GIF) — mesma tela do
+        // "+" do perfil. Antes caía numa preview própria da câmera (sem esses
+        // recursos), que era a "tela diferente" relatada.
+        nav.navigate('StoryEditor', { uri: foto.uri, tipo: 'imagem', mime: 'image/jpeg' });
       }
     } catch (e) {
       setCountdown(null);
@@ -189,8 +192,8 @@ export default function CameraScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
       const video = await cameraRef.current.recordAsync({ maxDuration: STORIE_MAX_S });
       if (video?.uri) {
-        setPreview({ uri: video.uri, tipo: 'video' });
-        setPreviewMuted(false);
+        // Direto pro editor (mesma tela do "+" do perfil, com todas as figurinhas).
+        nav.navigate('StoryEditor', { uri: video.uri, tipo: 'video', mime: 'video/mp4' });
       }
     } catch (e) {
       Alert.alert('Erro', e.message || 'Não deu pra gravar.');
