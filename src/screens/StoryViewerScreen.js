@@ -107,6 +107,57 @@ function StoryOverlays({ story, W, H, navigation }) {
     </View>
   );
 }
+
+// Sticker da música do story. estilo: 'card' (cartão com nome), 'disco' (disco
+// girando + nome) ou 'oculto' (nada — só a música de fundo).
+function MusicaSticker({ overlay, insetTop }) {
+  const estilo = overlay?.estilo || 'card';
+  const spin = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (estilo !== 'disco') return;
+    const anim = Animated.loop(Animated.timing(spin, { toValue: 1, duration: 3500, useNativeDriver: true }));
+    anim.start();
+    return () => anim.stop();
+  }, [estilo]);
+  if (estilo === 'oculto') return null;
+  const titulo = overlay?.titulo || 'Som';
+  const artista = overlay?.artista || '';
+  if (estilo === 'disco') {
+    const rot = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+    return (
+      <View style={[msStyles.discoWrap, { top: insetTop }]} pointerEvents="none">
+        <Animated.View style={[msStyles.disco, { transform: [{ rotate: rot }] }]}>
+          <View style={msStyles.discoDot} />
+          <View style={msStyles.discoHole} />
+        </Animated.View>
+        <View style={msStyles.discoLabel}>
+          <Text style={msStyles.cardTitulo} numberOfLines={1}>{titulo}</Text>
+          {artista ? <Text style={msStyles.cardArtista} numberOfLines={1}>{artista}</Text> : null}
+        </View>
+      </View>
+    );
+  }
+  return (
+    <View style={[msStyles.cardWrap, { top: insetTop }]} pointerEvents="none">
+      <View style={msStyles.cardThumb}><Ionicons name="musical-note" size={18} color="#fff" /></View>
+      <View style={{ maxWidth: 190 }}>
+        <Text style={msStyles.cardTitulo} numberOfLines={1}>{titulo}</Text>
+        {artista ? <Text style={msStyles.cardArtista} numberOfLines={1}>{artista}</Text> : null}
+      </View>
+    </View>
+  );
+}
+const msStyles = StyleSheet.create({
+  cardWrap: { position: 'absolute', alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(255,255,255,0.14)', borderColor: 'rgba(255,255,255,0.25)', borderWidth: 1, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 12 },
+  cardThumb: { width: 34, height: 34, borderRadius: 6, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' },
+  cardTitulo: { color: '#fff', fontSize: 13.5, fontWeight: '800' },
+  cardArtista: { color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 1 },
+  discoWrap: { position: 'absolute', alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 8 },
+  disco: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#141414', borderColor: 'rgba(255,255,255,0.55)', borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  discoDot: { position: 'absolute', top: 5, width: 6, height: 6, borderRadius: 3, backgroundColor: '#4da3ff' },
+  discoHole: { width: 9, height: 9, borderRadius: 5, backgroundColor: 'rgba(255,255,255,0.85)' },
+  discoLabel: { backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 100, maxWidth: 200 },
+});
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -199,10 +250,14 @@ export default function StoryViewerScreen({ route, navigation }) {
       try { if (musicaRef.current) { await musicaRef.current.unloadAsync(); musicaRef.current = null; } } catch (_) {}
       if (!musicaUrl) return;
       try {
-        await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
-        const { sound } = await Audio.Sound.createAsync({ uri: musicaUrl }, { shouldPlay: !paused, isLooping: true, volume: 1 });
+        // Android: 'shouldPlay:true' no createAsync às vezes NÃO dispara quando há
+        // outro player/Video na tela. Padrão confiável = criar parado e dar
+        // playAsync() explícito. shouldDuckAndroid:false pra não abaixar o volume.
+        await Audio.setAudioModeAsync({ playsInSilentModeIOS: true, shouldDuckAndroid: false, playThroughEarpieceAndroid: false });
+        const { sound } = await Audio.Sound.createAsync({ uri: musicaUrl }, { shouldPlay: false, isLooping: true, volume: 1 });
         if (!vivo) { sound.unloadAsync().catch(() => {}); return; }
         musicaRef.current = sound;
+        if (!paused) { try { await sound.playAsync(); } catch (_) {} }
       } catch (_) {}
     })();
     return () => { vivo = false; };
@@ -374,15 +429,8 @@ export default function StoryViewerScreen({ route, navigation }) {
         </TouchableOpacity>
       </View>
 
-      {/* Pill da música tocando (🎵 artista · título) */}
-      {musicaUrl ? (
-        <View style={[styles.musicaPillV, { top: insets.top + 58 }]} pointerEvents="none">
-          <Ionicons name="musical-notes" size={13} color="#fff" />
-          <Text style={styles.musicaPillVTxt} numberOfLines={1}>
-            {musicaOverlay?.artista ? `${musicaOverlay.artista} · ` : ''}{musicaOverlay?.titulo || 'Som'}
-          </Text>
-        </View>
-      ) : null}
+      {/* Sticker da música tocando (cartão / disco / oculto — escolha do autor) */}
+      {musicaUrl ? <MusicaSticker overlay={musicaOverlay} insetTop={insets.top + 56} /> : null}
 
       {/* Rodape do MEU status: quem viu */}
       {isMine && (

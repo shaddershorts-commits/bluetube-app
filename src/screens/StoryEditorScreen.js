@@ -128,6 +128,7 @@ export default function StoryEditorScreen() {
   // e também vai em musica_url. O viewer TOCA a url por cima da mídia — não é
   // "colada" no vídeo (assim é 100% metadados, igual ao Instagram).
   const [musica, setMusica] = useState(null);      // {url, titulo, artista}
+  const [musicaEstilo, setMusicaEstilo] = useState('card'); // 'card' | 'disco' | 'oculto'
   const [sons, setSons] = useState([]);
   const [sonsQ, setSonsQ] = useState('');
   const [sonsLoad, setSonsLoad] = useState(false);
@@ -274,7 +275,7 @@ export default function StoryEditorScreen() {
     // A música vira uma camada 'musica' (pra mostrar o pill 🎵 no viewer) e
     // também vai em musica_url (pro viewer tocar por cima da mídia).
     const overlaysFinais = musica
-      ? [...overlays, { tipo: 'musica', url: musica.url, titulo: musica.titulo, artista: musica.artista }]
+      ? [...overlays, { tipo: 'musica', url: musica.url, titulo: musica.titulo, artista: musica.artista, estilo: musicaEstilo }]
       : overlays;
     try {
       const r = isTexto
@@ -330,14 +331,24 @@ export default function StoryEditorScreen() {
         {!isTexto && filtroCor !== 'transparent' ? <View style={[StyleSheet.absoluteFill, { backgroundColor: filtroCor }]} pointerEvents="none" /> : null}
       </View>
 
-      {/* Pill da música escolhida (🎵 artista · título + remover) */}
+      {/* Música escolhida: pill (🎵 artista · título + remover) + como vai aparecer */}
       {musica ? (
-        <View style={[styles.musicaPill, { top: insets.top + 54 }]}>
-          <Ionicons name="musical-notes" size={13} color="#fff" />
-          <Text style={styles.musicaPillTxt} numberOfLines={1}>{musica.artista ? `${musica.artista} · ` : ''}{musica.titulo}</Text>
-          <TouchableOpacity onPress={() => { setMusica(null); pararPreview(); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="close" size={14} color="#fff" />
-          </TouchableOpacity>
+        <View style={[styles.musicaTopo, { top: insets.top + 50 }]} pointerEvents="box-none">
+          <View style={styles.musicaPill}>
+            <Ionicons name="musical-notes" size={13} color="#fff" />
+            <Text style={styles.musicaPillTxt} numberOfLines={1}>{musica.artista ? `${musica.artista} · ` : ''}{musica.titulo}</Text>
+            <TouchableOpacity onPress={() => { setMusica(null); setMusicaEstilo('card'); pararPreview(); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close" size={14} color="#fff" />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.estiloRow}>
+            {[{ k: 'card', ic: 'card-outline', l: 'Cartão' }, { k: 'disco', ic: 'disc-outline', l: 'Disco' }, { k: 'oculto', ic: 'eye-off-outline', l: 'Só de fundo' }].map((e) => (
+              <TouchableOpacity key={e.k} onPress={() => setMusicaEstilo(e.k)} style={[styles.estiloChip, musicaEstilo === e.k && styles.estiloChipOn]}>
+                <Ionicons name={e.ic} size={13} color={musicaEstilo === e.k ? '#0a0a0a' : '#fff'} />
+                <Text style={[styles.estiloChipTxt, musicaEstilo === e.k && { color: '#0a0a0a' }]}>{e.l}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
       ) : null}
 
@@ -665,8 +676,13 @@ const styles = StyleSheet.create({
   somUsar: { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 100, backgroundColor: '#eee' },
   somUsarOn: { backgroundColor: COLORS.neon },
   somUsarTxt: { fontSize: 13, fontWeight: '800', color: '#0a0a0a' },
-  musicaPill: { position: 'absolute', alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: '80%', backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 100 },
+  musicaTopo: { position: 'absolute', left: 0, right: 0, alignItems: 'center', gap: 8 },
+  musicaPill: { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: '82%', backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 100 },
   musicaPillTxt: { color: '#fff', fontSize: 13, fontWeight: '600', flexShrink: 1 },
+  estiloRow: { flexDirection: 'row', gap: 6 },
+  estiloChip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 100 },
+  estiloChipOn: { backgroundColor: '#fff' },
+  estiloChipTxt: { color: '#fff', fontSize: 12, fontWeight: '700' },
   // Camadas visuais das novas figurinhas
   enqBox: { backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: 14, padding: 12, minWidth: 200, alignItems: 'center' },
   enqPerg: { color: '#0a0a0a', fontSize: 15, fontWeight: '800', marginBottom: 10, textAlign: 'center' },
