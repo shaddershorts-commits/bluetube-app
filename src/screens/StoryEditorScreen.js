@@ -134,28 +134,35 @@ export default function StoryEditorScreen() {
   const [sonsOrigem, setSonsOrigem] = useState('royalty'); // 'royalty' | 'original'
   const [tocandoId, setTocandoId] = useState(null); // id da faixa em preview
   const previewRef = useRef(null);                   // Audio.Sound do preview
+  const montadoRef = useRef(true);                   // tela ainda montada?
+  const previewSeqRef = useRef(0);                   // invalida load em voo
   const buscarSons = useCallback(async (q, origem) => {
     setSonsLoad(true);
     try { const d = await blueAPI.sonsCatalogo({ q, origem }); setSons((d && d.sons) || []); } catch (e) { setSons([]); }
     setSonsLoad(false);
   }, []);
   const pararPreview = useCallback(async () => {
+    previewSeqRef.current++; // qualquer createAsync em andamento vira órfão e se descarrega
     try { if (previewRef.current) { await previewRef.current.unloadAsync(); previewRef.current = null; } } catch (_) {}
     setTocandoId(null);
   }, []);
   const preverSom = useCallback(async (s) => {
+    if (tocandoId === s.id) { await pararPreview(); return; }
+    await pararPreview();
+    const meuSeq = previewSeqRef.current; // token deste preview
     try {
-      if (tocandoId === s.id) { await pararPreview(); return; }
-      await pararPreview();
       await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
       const { sound } = await Audio.Sound.createAsync({ uri: s.url }, { shouldPlay: true, volume: 1 });
+      // Se saiu da tela, escolheu "Usar", ou começou outro preview enquanto o mp3
+      // carregava → descarrega já (senão a faixa tocaria "fantasma" fora da tela).
+      if (!montadoRef.current || meuSeq !== previewSeqRef.current) { sound.unloadAsync().catch(() => {}); return; }
       previewRef.current = sound;
       setTocandoId(s.id);
       sound.setOnPlaybackStatusUpdate((st) => { if (st.didJustFinish) pararPreview(); });
     } catch (e) { setTocandoId(null); }
   }, [tocandoId, pararPreview]);
-  // limpa o preview ao sair da tela
-  useEffect(() => () => { if (previewRef.current) { previewRef.current.unloadAsync().catch(() => {}); } }, []);
+  // limpa o preview ao sair da tela (e invalida load em voo)
+  useEffect(() => () => { montadoRef.current = false; previewSeqRef.current++; if (previewRef.current) { previewRef.current.unloadAsync().catch(() => {}); previewRef.current = null; } }, []);
 
   const novoId = () => 'ov_' + Date.now() + '_' + Math.round(Math.random() * 1e4);
 
