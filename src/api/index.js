@@ -483,6 +483,19 @@ export const blueAPI = {
     },
     // Busca de GIF (GIPHY via proxy do backend — a chave fica no servidor).
     buscarGifs: (q) => api(`blue-stories?action=gifs&q=${encodeURIComponent(q || '')}`),
+    // Story só de TEXTO (fundo colorido, sem upload de mídia) — modo "Criar".
+    storyCriarTexto: async ({ cor_fundo, overlays, audience } = {}) => {
+          const token = await getToken();
+          return api('blue-stories', {
+                method: 'POST',
+                body: JSON.stringify({
+                      action: 'criar', token, tipo: 'texto', texto: null,
+                      cor_fundo: cor_fundo || '#1a6bff', duracao: 6,
+                      audience: audience || 'stories',
+                      overlays: Array.isArray(overlays) ? overlays : [],
+                }),
+          });
+    },
     // Enquete: vota (0|1) numa camada de enquete do story; devolve contagem.
     votarEnquete: async (story_id, overlay_id, opcao) => {
           const token = await getToken();

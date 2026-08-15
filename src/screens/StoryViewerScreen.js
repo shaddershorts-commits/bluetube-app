@@ -291,6 +291,10 @@ export default function StoryViewerScreen({ route, navigation }) {
           </View>
         ) : story.media_url ? (
           <Image source={{ uri: story.media_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        ) : (Array.isArray(story.overlays) && story.overlays.some((o) => o && o.tipo === 'texto')) ? (
+          // Texto vive nos overlays (editor "Criar") — StoryOverlays renderiza na
+          // posição arrastada. Sem fallback centralizado pra não duplicar.
+          null
         ) : (
           <View style={styles.textStoryWrap}>
             <Text style={styles.textStory}>{story.texto}</Text>

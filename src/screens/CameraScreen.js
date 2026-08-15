@@ -272,6 +272,14 @@ export default function CameraScreen() {
             </View>
             <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.4)" />
           </TouchableOpacity>
+          <TouchableOpacity style={styles.chooserCard} activeOpacity={0.8} onPress={() => nav.navigate('StoryEditor', { modo: 'texto' })}>
+            <Text style={styles.chooserIcon}>🅰️</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.chooserCardTitle}>Texto</Text>
+              <Text style={styles.chooserCardSub}>Story só de texto, com fundo colorido · some em 24h</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.4)" />
+          </TouchableOpacity>
         </View>
       </View>
     );

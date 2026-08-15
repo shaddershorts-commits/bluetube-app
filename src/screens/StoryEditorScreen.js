@@ -35,6 +35,7 @@ const FILTROS = [
   { id: 'noite', nome: 'Noite', cor: 'rgba(10,20,60,0.34)' },
 ];
 const CORES_TEXTO = ['#ffffff', '#000000', '#3b82f6', '#ef4444', '#22c55e', '#f59e0b', '#ec4899', '#a855f7'];
+const CORES_FUNDO = ['#1a6bff', '#020817', '#000000', '#ef4444', '#22c55e', '#f59e0b', '#ec4899', '#a855f7', '#0ea5e9', '#14b8a6'];
 const TAMANHOS = [22, 30, 40, 54];
 const EMOJIS = ['😂','🥰','😍','🔥','❤️','👍','😎','🥺','😭','🎉','✨','💯','🙌','😅','🤣','😊','💪','🤝','🚀','👀','🫶','😏','🥳','😮','🤔','👏','💥','⭐','🌈','☀️'];
 
@@ -85,8 +86,10 @@ export default function StoryEditorScreen() {
   const insets = useSafeAreaInsets();
   const { width: W, height: H } = useWindowDimensions();
   // params: { uri, tipo:'imagem'|'video', mime }
-  const { uri, tipo = 'imagem', mime } = route.params || {};
+  const { uri, tipo = 'imagem', mime, modo } = route.params || {};
+  const isTexto = modo === 'texto' || (!uri && tipo === 'texto');
   const isVideo = tipo === 'video';
+  const [corFundo, setCorFundo] = useState('#1a6bff'); // fundo do story de texto
 
   const [overlays, setOverlays] = useState([]); // camadas
   const [selId, setSelId] = useState(null);
@@ -221,18 +224,24 @@ export default function StoryEditorScreen() {
 
   // ── ENVIAR ───────────────────────────────────────────────────────────────
   const enviar = async () => {
-    if (!uri) { Alert.alert('Erro', 'Sem mídia pra publicar.'); return; }
+    if (!isTexto && !uri) { Alert.alert('Erro', 'Sem mídia pra publicar.'); return; }
+    if (isTexto && !overlays.some((o) => o.tipo === 'texto')) {
+      Alert.alert('Escreva algo', 'Toque em "Texto" pra escrever no seu story.');
+      return;
+    }
     setEnviando(true);
     try {
-      const r = await blueAPI.storyCriar(uri, {
-        tipo: isVideo ? 'video' : 'imagem',
-        mime: mime || (isVideo ? 'video/mp4' : 'image/jpeg'),
-        audience: audiencia,
-        overlays,
-        filtro,
-        legenda: legenda.trim() || null,
-        som_off: isVideo ? somOff : undefined,
-      });
+      const r = isTexto
+        ? await blueAPI.storyCriarTexto({ cor_fundo: corFundo, overlays, audience: audiencia })
+        : await blueAPI.storyCriar(uri, {
+            tipo: isVideo ? 'video' : 'imagem',
+            mime: mime || (isVideo ? 'video/mp4' : 'image/jpeg'),
+            audience: audiencia,
+            overlays,
+            filtro,
+            legenda: legenda.trim() || null,
+            som_off: isVideo ? somOff : undefined,
+          });
       if (r?.ok || r?.story) {
         nav.goBack();
         setTimeout(() => Alert.alert('✓ Story publicado!', audiencia === 'status'
@@ -254,7 +263,7 @@ export default function StoryEditorScreen() {
     { key: 'figurinhas', icon: 'happy-outline', label: 'Figurinhas', on: () => setPainel(painel === 'figurinhas' ? null : 'figurinhas') },
     { key: 'mencao', icon: 'at', label: 'Mencionar', on: () => setPainel(painel === 'mencao' ? null : 'mencao') },
     { key: 'desenho', icon: 'brush', label: 'Desenhar', on: () => setDesenhando((v) => !v) },
-    { key: 'efeitos', icon: 'color-filter-outline', label: 'Efeitos', on: () => setPainel(painel === 'efeitos' ? null : 'efeitos') },
+    ...(!isTexto ? [{ key: 'efeitos', icon: 'color-filter-outline', label: 'Efeitos', on: () => setPainel(painel === 'efeitos' ? null : 'efeitos') }] : []),
     ...(isVideo ? [{ key: 'som', icon: somOff ? 'volume-mute' : 'volume-high', label: 'Som', on: () => setSomOff((v) => !v) }] : []),
   ];
 
@@ -262,13 +271,15 @@ export default function StoryEditorScreen() {
     <View style={styles.root}>
       {/* MÍDIA */}
       <View style={StyleSheet.absoluteFill}>
-        {isVideo ? (
+        {isTexto ? (
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: corFundo }]} />
+        ) : isVideo ? (
           <Video source={{ uri }} style={StyleSheet.absoluteFill} resizeMode={ResizeMode.COVER} shouldPlay isLooping isMuted={somOff} />
         ) : (
           <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
         )}
-        {/* filtro de cor */}
-        {filtroCor !== 'transparent' ? <View style={[StyleSheet.absoluteFill, { backgroundColor: filtroCor }]} pointerEvents="none" /> : null}
+        {/* filtro de cor (só em mídia) */}
+        {!isTexto && filtroCor !== 'transparent' ? <View style={[StyleSheet.absoluteFill, { backgroundColor: filtroCor }]} pointerEvents="none" /> : null}
       </View>
 
       {/* DESENHOS já confirmados */}
@@ -413,6 +424,17 @@ export default function StoryEditorScreen() {
         </View>
       ) : null}
 
+      {/* Paleta de fundo — só no modo texto (Criar) */}
+      {isTexto && !desenhando ? (
+        <View style={[styles.corFundoRow, { bottom: insets.bottom + 96 }]} pointerEvents="box-none">
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingHorizontal: 14 }}>
+            {CORES_FUNDO.map((c) => (
+              <TouchableOpacity key={c} onPress={() => setCorFundo(c)} style={[styles.corFundoDot, { backgroundColor: c }, corFundo === c && styles.corFundoOn]} />
+            ))}
+          </ScrollView>
+        </View>
+      ) : null}
+
       {/* RODAPÉ: legenda + audiência + enviar (escondido no desenho) */}
       {!desenhando ? (
         <View style={[styles.rodape, { paddingBottom: insets.bottom + 10 }]} pointerEvents="box-none">
@@ -528,6 +550,9 @@ const styles = StyleSheet.create({
   figSec: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 12, marginTop: 14, marginBottom: 4 },
   gifGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, padding: 10, justifyContent: 'center' },
   gifThumb: { width: 104, height: 104, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.06)' },
+  corFundoRow: { position: 'absolute', left: 0, right: 0 },
+  corFundoDot: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: 'rgba(255,255,255,0.5)' },
+  corFundoOn: { borderColor: '#fff', borderWidth: 3, transform: [{ scale: 1.15 }] },
   // Camadas visuais das novas figurinhas
   enqBox: { backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: 14, padding: 12, minWidth: 200, alignItems: 'center' },
   enqPerg: { color: '#0a0a0a', fontSize: 15, fontWeight: '800', marginBottom: 10, textAlign: 'center' },
